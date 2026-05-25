@@ -485,7 +485,36 @@ function requireSolanaWeb3() {
   return window.solanaWeb3;
 }
 
-async function sendSwarmsPayment(quote) {
+function updatePaymentStep(message) {
+  state.paymentMessage = message;
+  renderPaymentPanel(message);
+}
+
+function withTimeout(promise, timeoutMs, label) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} timed out. Check the wallet popup or try again.`)), timeoutMs);
+    }),
+  ]);
+}
+
+function createIdempotentAtaInstruction(web3, associatedProgram, tokenProgram, payer, ata, owner, mint) {
+  return new web3.TransactionInstruction({
+    programId: associatedProgram,
+    keys: [
+      { pubkey: payer, isSigner: true, isWritable: true },
+      { pubkey: ata, isSigner: false, isWritable: true },
+      { pubkey: owner, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: tokenProgram, isSigner: false, isWritable: false },
+    ],
+    data: new Uint8Array([1]),
+  });
+}
+
+async function sendSwarmsPayment(quote, onStep = () => {}) {
   const web3 = requireSolanaWeb3();
   const provider = window.solana;
   const connection = new web3.Connection(SOLANA_RPC_URL, "confirmed");
@@ -505,35 +534,8 @@ async function sendSwarmsPayment(quote) {
   );
 
   const amount = BigInt(quote.rawAmount);
-  const fromAccount = await connection.getAccountInfo(fromAta);
-  if (!fromAccount) {
-    throw new Error("This wallet does not have a $SWARMS token account yet. Add $SWARMS to this wallet, then try again.");
-  }
-
-  const balance = await connection.getTokenAccountBalance(fromAta);
-  const available = BigInt(balance.value.amount || "0");
-  if (available < amount) {
-    throw new Error(`Not enough $SWARMS. Need ${tokenAmount(quote.tokenAmount)} $SWARMS plus a small SOL network fee.`);
-  }
-
-  const toAccount = await connection.getAccountInfo(toAta);
   const transaction = new web3.Transaction();
-  if (!toAccount) {
-    transaction.add(
-      new web3.TransactionInstruction({
-        programId: associatedProgram,
-        keys: [
-          { pubkey: owner, isSigner: true, isWritable: true },
-          { pubkey: toAta, isSigner: false, isWritable: true },
-          { pubkey: treasury, isSigner: false, isWritable: false },
-          { pubkey: mint, isSigner: false, isWritable: false },
-          { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false },
-          { pubkey: tokenProgram, isSigner: false, isWritable: false },
-        ],
-        data: new Uint8Array(0),
-      }),
-    );
-  }
+  transaction.add(createIdempotentAtaInstruction(web3, associatedProgram, tokenProgram, owner, toAta, treasury, mint));
 
   const data = new Uint8Array(9);
   data[0] = 3;
@@ -551,25 +553,37 @@ async function sendSwarmsPayment(quote) {
   );
 
   transaction.feePayer = owner;
-  const latestBlockhash = await connection.getLatestBlockhash("confirmed");
+  onStep("Preparing Solana transaction...");
+  const latestBlockhash = await withTimeout(
+    connection.getLatestBlockhash("confirmed"),
+    12_000,
+    "Solana network preparation",
+  );
   transaction.recentBlockhash = latestBlockhash.blockhash;
 
   let signature;
-  if (provider.signAndSendTransaction) {
-    const result = await provider.signAndSendTransaction(transaction);
+  onStep(`Opening wallet approval for ${tokenAmount(quote.tokenAmount)} $SWARMS...`);
+  if (provider.signTransaction) {
+    const signed = await withTimeout(provider.signTransaction(transaction), 120_000, "Wallet approval");
+    signature = await withTimeout(connection.sendRawTransaction(signed.serialize()), 20_000, "Payment submission");
+  } else if (provider.signAndSendTransaction) {
+    const result = await withTimeout(provider.signAndSendTransaction(transaction), 120_000, "Wallet approval");
     signature = result.signature || result;
   } else {
-    if (!provider.signTransaction) throw new Error("Connected wallet does not support transaction signing.");
-    const signed = await provider.signTransaction(transaction);
-    signature = await connection.sendRawTransaction(signed.serialize());
+    throw new Error("Connected wallet does not support transaction signing.");
   }
-  await connection.confirmTransaction(
-    {
-      signature,
-      blockhash: latestBlockhash.blockhash,
-      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-    },
-    "confirmed",
+  onStep("Payment sent. Waiting for Solana confirmation...");
+  await withTimeout(
+    connection.confirmTransaction(
+      {
+        signature,
+        blockhash: latestBlockhash.blockhash,
+        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+      },
+      "confirmed",
+    ),
+    30_000,
+    "Payment confirmation",
   );
   return signature;
 }
@@ -596,7 +610,7 @@ async function unlockPremium() {
     const quote = await fetchPremiumQuote();
     state.paymentMessage = `Approve ${tokenAmount(quote.tokenAmount)} $SWARMS to ${shortAddress(quote.treasuryWallet)}.`;
     renderPaymentPanel(state.paymentMessage);
-    const signature = await sendSwarmsPayment(quote);
+    const signature = await sendSwarmsPayment(quote, updatePaymentStep);
     state.paymentSignature = signature;
     state.paymentStatus = "paid";
     state.paymentMessage = "Premium Pro unlocked after confirmed $SWARMS transfer.";
