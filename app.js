@@ -7,6 +7,7 @@ const state = {
     address: "",
     provider: "",
   },
+  premiumUnlocked: false,
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -90,12 +91,12 @@ function renderSearchResults(payload) {
 
 function notesPayload() {
   return {
-    wallet: $("#walletNotes").value,
-    liquidity: $("#liquidityNotes").value,
-    narrative: $("#narrativeNotes").value,
-    social: $("#socialNotes").value,
-    counter: $("#counterNotes").value,
-    private: $("#privateNotes").value,
+    wallet: $("#walletNotes")?.value || "",
+    liquidity: $("#liquidityNotes")?.value || "",
+    narrative: $("#narrativeNotes")?.value || "",
+    social: $("#socialNotes")?.value || "",
+    counter: $("#counterNotes")?.value || "",
+    private: $("#privateNotes")?.value || "",
   };
 }
 
@@ -173,6 +174,38 @@ function renderKeyValue(container, entries) {
     .join("");
 }
 
+function firstLine(value) {
+  if (Array.isArray(value)) return value[0] || "No evidence found yet.";
+  return value || "No evidence found yet.";
+}
+
+function renderAiDesk(result) {
+  const card = result.alphaCard;
+  $("#deskStatus").textContent = result.reviewEngine === "swarms" ? "Swarm filled" : "Filled";
+  $("#aiDesk").innerHTML = `
+    <article><span>Wallet</span><p>${escapeHtml(firstLine(card.evidenceTrail.wallet))}</p></article>
+    <article><span>Liquidity</span><p>${escapeHtml(firstLine(card.evidenceTrail.liquidity))}</p></article>
+    <article><span>Social/X</span><p>${escapeHtml(firstLine(card.evidenceTrail.socialMomentum))}</p></article>
+    <article><span>Risk</span><p>${escapeHtml(firstLine(card.evidenceTrail.counterSignals))}</p></article>
+  `;
+}
+
+function premiumGhostBack() {
+  return {
+    premiumFeeUsd: 1,
+    rewardPoolUsd: 0.4,
+    fundedBy: "Premium Signal revenue, not token trading fees",
+    splits: { signalScouts: 0.16, alphaValidators: 0.14, cardDistributors: 0.1 },
+  };
+}
+
+function renderPremiumButtons() {
+  const label = state.premiumUnlocked ? "Premium Ready" : "Pay $1 Premium";
+  $("#unlockPremium").textContent = label;
+  $("#sideUnlockPremium").textContent = state.premiumUnlocked ? "Premium Ready" : "Connect Wallet + Pay $1";
+  $("#premiumMode").checked = state.premiumUnlocked;
+}
+
 function renderAlphaCard(result) {
   const card = result.alphaCard;
   state.latestCard = result;
@@ -238,6 +271,8 @@ function renderAlphaCard(result) {
 
   renderSourceQuality(result);
   renderGhostBack(result.ghostBack);
+  renderAiDesk(result);
+  renderPremiumButtons();
   addHistory(result);
 }
 
@@ -320,6 +355,7 @@ function shortAddress(address) {
 function renderWallet() {
   const label = state.wallet.connected ? shortAddress(state.wallet.address) : "Not connected";
   $("#connectWallet").textContent = state.wallet.connected ? label : "Connect Wallet";
+  $("#resultConnectWallet").textContent = state.wallet.connected ? label : "Connect Wallet";
   $("#walletBox").innerHTML = state.wallet.connected
     ? `
       <div class="quality-row"><span>Status</span><strong>Connected</strong></div>
@@ -341,8 +377,10 @@ function renderWallet() {
       } catch {}
       state.wallet = { connected: false, address: "", provider: "" };
       renderWallet();
+      renderPremiumButtons();
     });
   }
+  renderPremiumButtons();
 }
 
 function openScanOverlay() {
@@ -380,6 +418,18 @@ async function connectWallet() {
   }
 }
 
+async function unlockPremium() {
+  if (!state.wallet.connected) {
+    await connectWallet();
+    if (!state.wallet.connected) return;
+  }
+  state.premiumUnlocked = true;
+  $("#premiumMode").checked = true;
+  renderPremiumButtons();
+  renderGhostBack(state.latestCard?.ghostBack || premiumGhostBack());
+  $("#deskStatus").textContent = "Premium unlocked";
+}
+
 async function runSearch() {
   const query = $("#queryInput").value.trim();
   if (!query) {
@@ -404,7 +454,7 @@ async function runAnalysis(event) {
         reviewEngine: $("#reviewEngine").value,
         sourceMode: $("#sourceMode").value,
         publicMode: $("#cardMode").value === "public",
-        premiumMode: $("#premiumMode").checked,
+        premiumMode: $("#premiumMode").checked || state.premiumUnlocked,
         notes: notesPayload(),
       }),
     });
@@ -463,6 +513,9 @@ $("#copyShare").addEventListener("click", async () => {
 });
 $("#exportCard").addEventListener("click", exportLatestCard);
 $("#connectWallet").addEventListener("click", connectWallet);
+$("#resultConnectWallet").addEventListener("click", connectWallet);
+$("#unlockPremium").addEventListener("click", unlockPremium);
+$("#sideUnlockPremium").addEventListener("click", unlockPremium);
 $("#heroRunScan")?.addEventListener("click", () => {
   openScanOverlay();
 });

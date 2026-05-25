@@ -244,42 +244,64 @@
                 </label>
               </div>
 
-              <label>
-                Card Mode
-                <select id="cardMode">
-                  <option value="public" selected>Public-safe card</option>
-                  <option value="private">Private research brief</option>
-                </select>
-              </label>
+              <input id="premiumMode" type="checkbox" hidden />
 
-              <label>
-                Wallet evidence
-                <textarea id="walletNotes" rows="3" placeholder="Wallet clusters, whale movement, smart wallet entries."></textarea>
-              </label>
-              <label>
-                Liquidity evidence
-                <textarea id="liquidityNotes" rows="3" placeholder="Liquidity changes, pool depth, slippage concerns."></textarea>
-              </label>
-              <label>
-                Narrative notes
-                <textarea id="narrativeNotes" rows="3" placeholder="Sector, launch context, market theme, narrative shift."></textarea>
-              </label>
-              <label>
-                Social momentum notes
-                <textarea id="socialNotes" rows="3" placeholder="Attention source, social quality, influencer risk."></textarea>
-              </label>
-              <label>
-                Counter-signals
-                <textarea id="counterNotes" rows="3" placeholder="Sell pressure, holder concentration, paid hype, rug or MEV concern."></textarea>
-              </label>
-              <label>
-                Private notes protected by VeilGuard
-                <textarea id="privateNotes" rows="3" placeholder="Sizing assumptions, private watchlist logic, strategy notes."></textarea>
-              </label>
-              <label class="checkline">
-                <input id="premiumMode" type="checkbox" />
-                Include Premium Pro and GhostBack economics
-              </label>
+              <section class="premium-access" aria-label="Premium access">
+                <div>
+                  <span>Premium Pro</span>
+                  <strong>$1 Alpha Card</strong>
+                  <p>Connect wallet, unlock the private brief, and route 40% to GhostBack.</p>
+                </div>
+                <button id="sideUnlockPremium" type="button">Connect + Unlock</button>
+              </section>
+
+              <section class="ai-desk" aria-label="AI evidence desk">
+                <div class="panel-title-row">
+                  <p class="eyebrow">AI Evidence Desk</p>
+                  <span id="deskStatus">Waiting</span>
+                </div>
+                <div id="aiDesk" class="ai-desk-grid">
+                  <article><span>Wallet</span><p>Run a scan and GhostVeil will fill this from observed or provided evidence.</p></article>
+                  <article><span>Liquidity</span><p>Market context appears here after DexScreener or provided data is reviewed.</p></article>
+                  <article><span>Social/X</span><p>X post timing appears here when a status URL is provided.</p></article>
+                  <article><span>Risk</span><p>Counter-signals and invalidation logic appear here after review.</p></article>
+                </div>
+              </section>
+
+              <details class="manual-evidence">
+                <summary>Optional manual evidence</summary>
+                <label>
+                  Card Mode
+                  <select id="cardMode">
+                    <option value="public" selected>Public-safe card</option>
+                    <option value="private">Private research brief</option>
+                  </select>
+                </label>
+                <label>
+                  Wallet evidence
+                  <textarea id="walletNotes" rows="3" placeholder="Optional: wallet clusters, whale movement, smart wallet entries."></textarea>
+                </label>
+                <label>
+                  Liquidity evidence
+                  <textarea id="liquidityNotes" rows="3" placeholder="Optional: liquidity changes, pool depth, slippage concerns."></textarea>
+                </label>
+                <label>
+                  Narrative notes
+                  <textarea id="narrativeNotes" rows="3" placeholder="Optional: sector, launch context, market theme, narrative shift."></textarea>
+                </label>
+                <label>
+                  Social momentum notes
+                  <textarea id="socialNotes" rows="3" placeholder="Optional: X URL, attention source, social quality, influencer risk."></textarea>
+                </label>
+                <label>
+                  Counter-signals
+                  <textarea id="counterNotes" rows="3" placeholder="Optional: sell pressure, holder concentration, paid hype, rug or MEV concern."></textarea>
+                </label>
+                <label>
+                  Private notes protected by VeilGuard
+                  <textarea id="privateNotes" rows="3" placeholder="Optional: private watchlist logic or strategy notes."></textarea>
+                </label>
+              </details>
             </form>
           </aside>
 
@@ -289,13 +311,17 @@
                 <p class="eyebrow">Core Principle</p>
                 <strong>Find early Solana alpha before it gets crowded.</strong>
               </div>
-              <button id="exportCard" disabled>Export Card</button>
+              <div class="result-tools">
+                <button id="resultConnectWallet" type="button">Connect Wallet</button>
+                <button id="unlockPremium" type="button">Unlock Premium - $1</button>
+                <button id="exportCard" disabled>Export Card</button>
+              </div>
             </div>
 
             <article id="emptyState" class="empty-state">
               <p class="eyebrow">Ready</p>
-              <h2>Enter a Solana asset or paste your own evidence.</h2>
-              <p>GhostVeil will fetch market context when available, separate observed evidence from assumptions, stress-test the signal, and return a structured Alpha Card.</p>
+              <h2>Enter a token, mint, pair, or X post.</h2>
+              <p>GhostVeil fetches market context, derives the evidence desk, stress-tests the signal, and returns a structured Alpha Card.</p>
             </article>
 
             <article id="alphaCard" class="alpha-card hidden" aria-label="GhostVeil Alpha Card">
