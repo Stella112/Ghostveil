@@ -4,11 +4,6 @@ const path = require("path");
 const swarmsModel = process.env.SWARMS_MODEL || "gpt-4o-mini";
 const swarmsBaseUrl = process.env.SWARMS_BASE_URL || "https://api.swarms.world";
 const swarmsMode = process.env.SWARMS_MODE || "swarm";
-const premiumUsd = Number(process.env.PREMIUM_USD || "0.1");
-const swarmsMint = process.env.SWARMS_TOKEN_MINT || "74SBV4zDXxTRgv1pEMoECskKBkZHc2yGPnc7GYVepump";
-const swarmsDecimals = Number(process.env.SWARMS_TOKEN_DECIMALS || "6");
-const premiumTreasuryWallet =
-  process.env.PREMIUM_TREASURY_WALLET || "4ogwVdsKTyCKB9mowj5QyehhCpiQE5FsijG8gcL5haYE";
 
 function clamp(value, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(value)));
@@ -102,7 +97,7 @@ function stageFromScores(stealth, risk, age) {
 function verdictFromScores(ghostProof, risk, conviction) {
   if (risk >= 82) return "High Risk";
   if (ghostProof >= 72 && risk < 60) return "Approved";
-  if (ghostProof >= 62 && conviction >= 58) return "Premium Signal Candidate";
+  if (ghostProof >= 62 && conviction >= 58) return "Research Candidate";
   if (ghostProof >= 48) return "Watchlist";
   return "Rejected";
 }
@@ -201,40 +196,6 @@ async function fetchDexScreener(query) {
   }
 }
 
-async function getPremiumQuote() {
-  const result = await fetchDexScreener(swarmsMint);
-  const pair =
-    result.pairs.find((item) => item.baseToken?.address === swarmsMint || item.quoteToken?.address === swarmsMint) ||
-    result.pairs[0];
-  const priceUsd = number(pair?.priceUsd);
-  if (!priceUsd) {
-    return {
-      ok: false,
-      error: "Unable to quote $SWARMS price from DexScreener.",
-      premiumUsd,
-      mint: swarmsMint,
-      treasuryWallet: premiumTreasuryWallet,
-      decimals: swarmsDecimals,
-    };
-  }
-
-  const tokenAmount = premiumUsd / priceUsd;
-  const rawAmount = Math.ceil(tokenAmount * 10 ** swarmsDecimals).toString();
-  return {
-    ok: true,
-    premiumUsd,
-    symbol: "$SWARMS",
-    mint: swarmsMint,
-    decimals: swarmsDecimals,
-    treasuryWallet: premiumTreasuryWallet,
-    priceUsd,
-    tokenAmount,
-    rawAmount,
-    pairUrl: pair?.url || null,
-    quotedAt: new Date().toISOString(),
-  };
-}
-
 function getGhostveilSystemPrompt() {
   const candidates = [
     path.join(process.cwd(), "agent", "system_prompt.md"),
@@ -253,7 +214,7 @@ function getGhostveilSystemPrompt() {
   ].join("\n");
 }
 
-function analyzeSignal({ query, pair, notes = {}, publicMode = true, premiumMode = false, connectorError = null }) {
+function analyzeSignal({ query, pair, notes = {}, publicMode = true, connectorError = null }) {
   const walletNotes = parseNotes(notes.wallet);
   const liquidityNotes = parseNotes(notes.liquidity);
   const narrativeNotes = parseNotes(notes.narrative);
@@ -413,8 +374,8 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, premiumMode
   const suggested =
     finalVerdict === "Approved"
       ? "Monitor and research deeper. Do not treat this as a buy signal. Watch invalidation conditions first."
-      : finalVerdict === "Premium Signal Candidate"
-        ? "Request Premium Pro Card for deeper evidence, private brief notes, and alert logic."
+      : finalVerdict === "Research Candidate"
+        ? "Research deeper with the full Alpha Card, private brief mode, and alert logic. No payment is required in this build."
         : finalVerdict === "Watchlist"
           ? "Keep on watchlist and wait for stronger liquidity, wallet, and narrative confirmation."
           : "Avoid or reject until the evidence materially improves.";
@@ -467,27 +428,18 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, premiumMode
       suggestedNextSteps: suggested,
       finalVerdict,
       shareableSummary: `GhostVeil Alpha Card: ${tokenName} is ${currentStage.toLowerCase()} with Stealth ${stealth}, Conviction ${conviction}, Risk ${risk}, GhostProof ${ghostProof}. Verdict: ${finalVerdict}. Watch invalidation before acting.`,
-      premiumMode,
       disclaimer:
         "GhostVeil provides market intelligence and risk-aware research outputs. This is not financial advice and does not guarantee profit.",
     },
-    ghostBack: premiumMode
-      ? {
-          premiumFeeUsd: 0.1,
-          rewardPoolUsd: 0.04,
-          fundedBy: "Premium Signal revenue, not token trading fees",
-          splits: { signalScouts: 0.016, alphaValidators: 0.014, cardDistributors: 0.01 },
-        }
-      : null,
   };
 }
 
-function buildSwarmsTask({ query, pair, notes, publicMode, premiumMode, localResult }) {
+function buildSwarmsTask({ query, pair, notes, publicMode, localResult }) {
   return JSON.stringify(
     {
       instruction:
         "Return a GhostVeil Alpha Card as strict JSON. Use only the observed market context and user-provided notes below. Separate observed evidence from assumptions. Do not tell the user to buy or sell.",
-      userRequest: { query, publicMode, premiumMode },
+      userRequest: { query, publicMode },
       observedMarketContext: compactPairForAgent(pair),
       userProvidedEvidence: notes || {},
       localPrecheck: localResult?.alphaCard || null,
@@ -625,7 +577,7 @@ function mergeSwarmsAlphaCard(localResult, swarmsCard) {
   };
 }
 
-async function runSwarmsReview({ query, pair, notes, publicMode, premiumMode, localResult }) {
+async function runSwarmsReview({ query, pair, notes, publicMode, localResult }) {
   if (!process.env.SWARMS_API_KEY) {
     return {
       enabled: false,
@@ -634,7 +586,7 @@ async function runSwarmsReview({ query, pair, notes, publicMode, premiumMode, lo
     };
   }
 
-  const task = buildSwarmsTask({ query, pair, notes, publicMode, premiumMode, localResult });
+  const task = buildSwarmsTask({ query, pair, notes, publicMode, localResult });
   const useSwarm = swarmsMode !== "agent";
   const response = await fetch(`${swarmsBaseUrl}${useSwarm ? "/v1/swarm/completions" : "/v1/agent/completions"}`, {
     method: "POST",
@@ -702,7 +654,6 @@ async function runSwarmsReview({ query, pair, notes, publicMode, premiumMode, lo
 module.exports = {
   analyzeSignal,
   fetchDexScreener,
-  getPremiumQuote,
   mergeSwarmsAlphaCard,
   runSwarmsReview,
 };

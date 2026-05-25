@@ -5,7 +5,7 @@
   "description": "Working Solana signal verification app and Swarms marketplace agent package.",
   "scripts": {
     "start": "node server.js",
-    "check": "node --check app.js && node --check server.js && node --check api/_ghostveil.js && node --check api/health.js && node --check api/search.js && node --check api/analyze.js && node --check api/premium-quote.js && node --check scripts/smoke-test.js",
+    "check": "node --check app.js && node --check server.js && node --check api/_ghostveil.js && node --check api/health.js && node --check api/search.js && node --check api/analyze.js && node --check scripts/smoke-test.js",
     "test:api": "node scripts/smoke-test.js"
   },
   "keywords": [

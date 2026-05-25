@@ -13,8 +13,7 @@ GhostVeil does not execute trades, promise profit, or invent live data. If live 
 3. GhostVeil fills the AI Evidence Desk.
 4. Choose local GhostVeil rules or Swarms multi-agent review.
 5. Generate a GhostVeil Alpha Card with ratings, route, evidence, risk, and verdict.
-6. Unlock Premium Pro with the $SWARMS equivalent of $0.10.
-7. Export the Alpha Card JSON or copy the public-safe X/Discord summary.
+6. Export the Alpha Card JSON or copy the public-safe X/Discord summary.
 
 ## What the App Includes
 
@@ -26,10 +25,9 @@ GhostVeil does not execute trades, promise profit, or invent live data. If live 
 - GhostTrade Risk Preview with best/base/worst paths and invalidation point
 - GhostProof Score and final verdict
 - Watchlist history stored locally in the browser
-- Premium Pro mode with real $SWARMS transfer flow and GhostBack reward economics
+- Free full-detail Alpha Cards with no wallet or payment gate
 - Exportable Alpha Card JSON
 - Swarms multi-agent review when `SWARMS_API_KEY` is configured
-- Client-side Solana wallet connect and SPL-token Premium payment flow
 
 ## Run Locally
 
@@ -46,7 +44,6 @@ GhostVeil includes Vercel serverless API routes:
 - `api/health.js`
 - `api/search.js`
 - `api/analyze.js`
-- `api/premium-quote.js`
 
 Deploy steps:
 
@@ -84,10 +81,6 @@ SWARMS_API_KEY=your-real-key-here
 SWARMS_MODEL=gpt-4o-mini
 SWARMS_BASE_URL=https://api.swarms.world
 SWARMS_MODE=swarm
-PREMIUM_USD=0.1
-SWARMS_TOKEN_MINT=74SBV4zDXxTRgv1pEMoECskKBkZHc2yGPnc7GYVepump
-SWARMS_TOKEN_DECIMALS=6
-PREMIUM_TREASURY_WALLET=4ogwVdsKTyCKB9mowj5QyehhCpiQE5FsijG8gcL5haYE
 PORT=4173
 ```
 
@@ -123,10 +116,6 @@ The API key stays on the server. It is never sent to the browser.
 | `SWARMS_MODEL` | No | Defaults to `gpt-4o-mini` |
 | `SWARMS_BASE_URL` | No | Defaults to `https://api.swarms.world` |
 | `SWARMS_MODE` | No | Defaults to `swarm`; set `agent` for fallback |
-| `PREMIUM_USD` | No | Defaults to `0.1` |
-| `SWARMS_TOKEN_MINT` | No | Defaults to the $SWARMS Solana mint used by the app |
-| `SWARMS_TOKEN_DECIMALS` | No | Defaults to `6` |
-| `PREMIUM_TREASURY_WALLET` | No | Defaults to `4ogwVdsKTyCKB9mowj5QyehhCpiQE5FsijG8gcL5haYE` |
 | `PORT` | No | Defaults to `4173` |
 
 DexScreener search does not require an API key.
@@ -164,7 +153,7 @@ GhostVeil is market intelligence software, not financial advice.
 - It separates observed evidence from assumptions.
 - It includes risks and invalidation conditions.
 - It protects private user intent from public Alpha Cards.
-- Connected wallet addresses stay client-side and are not sent into Swarms analysis prompts.
+- It does not require wallet connection or payment in the current build.
 
 ## Swarms References
 

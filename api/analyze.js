@@ -28,7 +28,6 @@ module.exports = async function handler(req, res) {
       pair: selectedPair,
       notes: body.notes,
       publicMode: body.publicMode !== false,
-      premiumMode: Boolean(body.premiumMode),
       connectorError,
     });
 
@@ -38,7 +37,6 @@ module.exports = async function handler(req, res) {
         pair: selectedPair,
         notes: body.notes,
         publicMode: body.publicMode !== false,
-        premiumMode: Boolean(body.premiumMode),
         localResult: result,
       });
       const merged = mergeSwarmsAlphaCard(result, swarmsReview.parsed);

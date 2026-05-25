@@ -6,7 +6,7 @@ Find early Solana alpha before it gets crowded.
 
 ## Short Description
 
-Privacy-first Solana alpha verification swarm. GhostVeil scans token, mint, pair, and X-post inputs, fetches live market context, runs a multi-agent judge panel, protects trader intent, and outputs verified Alpha Cards with evidence, route, ratings, risk, and premium unlocks.
+Privacy-first Solana alpha verification swarm. GhostVeil scans token, mint, pair, and X-post inputs, fetches live market context, runs a multi-agent judge panel, protects trader intent, and outputs full Alpha Cards with evidence, route, ratings, risk, and exportable summaries.
 
 ## Full Description
 
@@ -36,20 +36,14 @@ It operates through four core engines:
 4. Alpha Tribunal judges.
 5. VeilGuard sanitizes.
 6. GhostProof delivers the verified Alpha Card.
-7. User can unlock Premium Pro by paying the $SWARMS equivalent of $0.10.
 
-## Monetization and Access
+## Access
 
-- Free tier: basic scans and public-safe Alpha Cards
-- Premium Pro Signals: $0.10 per premium Alpha Card
-- Payment: $SWARMS equivalent of $0.10 to the GhostVeil treasury wallet
-- Treasury wallet: `4ogwVdsKTyCKB9mowj5QyehhCpiQE5FsijG8gcL5haYE`
-- GhostBack Rewards: 40% of Premium Signal revenue goes into the contributor pool
-- Frenzy Mode: enabled for creator revenue share on every use
-
-GhostBack rewards Signal Scouts, Alpha Validators, Card Distributors, and Power Users. It is funded by actual Premium Signal usage, not token trading fees.
-
-GhostVeil creates a clean loop: better verified signals -> more Premium usage -> larger GhostBack pool -> stronger contributors -> better signals.
+- Current build: free full-detail Alpha Cards
+- No wallet connection required
+- No premium paywall
+- x402 payment support is planned as a separate API payment route after the core app is stable
+- Frenzy Mode: ready to enable once monetization is reintroduced
 
 ## Working App Features
 
@@ -57,9 +51,6 @@ GhostVeil creates a clean loop: better verified signals -> more Premium usage ->
 - AI Evidence Desk filled by GhostVeil, not manual user labor
 - Optional manual evidence only for advanced users
 - Swarms multi-agent completion flow
-- Solana wallet connect through Phantom-compatible providers
-- Real SPL-token payment transaction for $SWARMS premium unlocks
-- Quote endpoint for `$0.10` worth of `$SWARMS`
 - Alpha Rating and Source Rating
 - Signal route and X-post timestamp decoding
 - Exportable Alpha Card JSON
@@ -72,10 +63,10 @@ GhostVeil creates a clean loop: better verified signals -> more Premium usage ->
 - Tagline: Find early Solana alpha before it gets crowded.
 - Category: Finance / DeFi / Research / Tools
 - Product type: Multi-agent app
-- Pricing: Free tier plus $0.10 Premium Pro in $SWARMS
-- Frenzy Mode: Enabled
+- Pricing: Free during hackathon judging
+- Frenzy Mode: Planned after x402 integration is rebuilt
 - Ticker idea: GVEIL
-- Tags: solana, defi, alpha, swarms, x402, frenzy, market-analysis, risk-scoring, privacy, spl-token
+- Tags: solana, defi, alpha, swarms, market-analysis, risk-scoring, privacy, x402-ready
 
 ## Differentiation
 

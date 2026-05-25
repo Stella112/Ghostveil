@@ -2,23 +2,7 @@ const state = {
   selectedPair: null,
   latestCard: null,
   history: JSON.parse(localStorage.getItem("ghostveil-history") || "[]"),
-  wallet: {
-    connected: false,
-    address: "",
-    provider: "",
-  },
-  premiumUnlocked: false,
-  paymentStatus: "unpaid",
-  premiumQuote: null,
-  paymentSignature: "",
-  paymentMessage: "",
 };
-
-const PREMIUM_FEE_USD = 0.1;
-const GHOSTBACK_RATE = 0.4;
-const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
-const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -208,58 +192,6 @@ function renderAiDesk(result) {
   `;
 }
 
-function premiumGhostBack() {
-  const rewardPoolUsd = PREMIUM_FEE_USD * GHOSTBACK_RATE;
-  return {
-    premiumFeeUsd: PREMIUM_FEE_USD,
-    rewardPoolUsd,
-    fundedBy: "Premium Signal revenue, not token trading fees",
-    splits: { signalScouts: 0.016, alphaValidators: 0.014, cardDistributors: 0.01 },
-  };
-}
-
-function renderPaymentPanel(message = "") {
-  const walletLabel = state.wallet.connected ? shortAddress(state.wallet.address) : "Not connected";
-  const quote = state.premiumQuote;
-  const status =
-    state.paymentStatus === "paid"
-      ? "Paid"
-      : state.paymentStatus === "pending"
-        ? "Awaiting wallet approval"
-        : "Not paid";
-  const panelMessage =
-    message ||
-    state.paymentMessage ||
-    "Connect a Solana wallet, then approve a real $SWARMS transfer equivalent to $0.10.";
-  $("#paymentPanel").innerHTML = `
-    <div class="quality-row"><span>Wallet</span><strong>${escapeHtml(walletLabel)}</strong></div>
-    <div class="quality-row"><span>Premium fee</span><strong>${money(PREMIUM_FEE_USD)} in $SWARMS</strong></div>
-    <div class="quality-row"><span>$SWARMS due</span><strong>${quote?.tokenAmount ? tokenAmount(quote.tokenAmount) : "Quote on pay"}</strong></div>
-    <div class="quality-row"><span>Destination</span><strong>${escapeHtml(quote?.treasuryWallet ? shortAddress(quote.treasuryWallet) : "4ogw...haYE")}</strong></div>
-    <div class="quality-row"><span>GhostBack</span><strong>${money(PREMIUM_FEE_USD * GHOSTBACK_RATE)}</strong></div>
-    <div class="quality-row"><span>Status</span><strong>${escapeHtml(status)}</strong></div>
-    ${state.paymentSignature ? `<div class="quality-row"><span>Signature</span><strong>${escapeHtml(shortAddress(state.paymentSignature))}</strong></div>` : ""}
-    <p>${escapeHtml(panelMessage)}</p>
-  `;
-}
-
-function renderPremiumButtons() {
-  const pending = state.paymentStatus === "pending";
-  const label = state.premiumUnlocked ? "Premium Ready" : pending ? "Awaiting Wallet" : "Pay $0.10 Premium";
-  $("#unlockPremium").textContent = label;
-  $("#sideUnlockPremium").textContent = state.premiumUnlocked
-    ? "Premium Ready"
-    : pending
-      ? "Awaiting Wallet Approval"
-      : state.wallet.connected
-      ? "Pay $0.10 in $SWARMS"
-      : "Connect Wallet + Pay $0.10";
-  $("#unlockPremium").disabled = pending;
-  $("#sideUnlockPremium").disabled = pending;
-  $("#premiumMode").checked = state.premiumUnlocked;
-  renderPaymentPanel();
-}
-
 function renderAlphaCard(result) {
   const card = result.alphaCard;
   state.latestCard = result;
@@ -324,9 +256,7 @@ function renderAlphaCard(result) {
   ]);
 
   renderSourceQuality(result);
-  renderGhostBack(result.ghostBack);
   renderAiDesk(result);
-  renderPremiumButtons();
   addHistory(result);
 }
 
@@ -347,24 +277,6 @@ function renderSourceQuality(result) {
       ${(quality.assumptions.length ? quality.assumptions : ["No major assumptions recorded."])
         .map((item) => `<p>${escapeHtml(item)}</p>`)
         .join("")}
-    </div>
-  `;
-}
-
-function renderGhostBack(ghostBack) {
-  if (!ghostBack) {
-    $("#ghostBackBox").innerHTML = "<p>Enable Premium Pro to show reward economics.</p>";
-    return;
-  }
-
-  $("#ghostBackBox").innerHTML = `
-    <div class="quality-row"><span>Premium fee</span><strong>${money(ghostBack.premiumFeeUsd)}</strong></div>
-    <div class="quality-row"><span>Reward pool</span><strong>${money(ghostBack.rewardPoolUsd)}</strong></div>
-    <p>${escapeHtml(ghostBack.fundedBy)}.</p>
-    <div class="split-list">
-      <div><span>Signal Scouts</span><b>${money(ghostBack.splits.signalScouts)}</b></div>
-      <div><span>Alpha Validators</span><b>${money(ghostBack.splits.alphaValidators)}</b></div>
-      <div><span>Card Distributors</span><b>${money(ghostBack.splits.cardDistributors)}</b></div>
     </div>
   `;
 }
@@ -406,39 +318,6 @@ function shortAddress(address) {
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
-function renderWallet() {
-  const label = state.wallet.connected ? shortAddress(state.wallet.address) : "Not connected";
-  $("#connectWallet").textContent = state.wallet.connected ? label : "Connect Wallet";
-  $("#resultConnectWallet").textContent = state.wallet.connected ? label : "Connect Wallet";
-  $("#walletBox").innerHTML = state.wallet.connected
-    ? `
-      <div class="quality-row"><span>Status</span><strong>Connected</strong></div>
-      <div class="quality-row"><span>Provider</span><strong>${escapeHtml(state.wallet.provider)}</strong></div>
-      <div class="quality-row"><span>Address</span><strong>${escapeHtml(label)}</strong></div>
-      <p>Wallet is connected locally for marketplace/payment readiness. The full address is not sent to GhostVeil analysis or Swarms prompts.</p>
-      <button id="disconnectWallet" type="button" class="quiet-button">Disconnect</button>
-    `
-    : `
-      <div class="quality-row"><span>Status</span><strong>Not connected</strong></div>
-      <p>Connect Phantom or another Solana wallet for launch readiness. GhostVeil keeps the connected wallet client-side.</p>
-    `;
-
-  const disconnect = $("#disconnectWallet");
-  if (disconnect) {
-    disconnect.addEventListener("click", async () => {
-      try {
-        await window.solana?.disconnect?.();
-      } catch {}
-      state.wallet = { connected: false, address: "", provider: "" };
-      state.paymentStatus = "unpaid";
-      state.premiumUnlocked = false;
-      renderWallet();
-      renderPremiumButtons();
-    });
-  }
-  renderPremiumButtons();
-}
-
 function openScanOverlay() {
   $("#scanOverlay")?.classList.remove("hidden");
   document.body.classList.add("overlay-open");
@@ -448,186 +327,6 @@ function openScanOverlay() {
 function closeScanOverlay() {
   $("#scanOverlay")?.classList.add("hidden");
   document.body.classList.remove("overlay-open");
-}
-
-async function connectWallet() {
-  const provider = window.solana;
-  if (!provider?.isPhantom && !provider?.connect) {
-    $("#walletBox").innerHTML = `
-      <div class="notice">No Solana wallet was detected. Install Phantom, reload the page, then connect.</div>
-      <p>Phantom: https://phantom.app</p>
-    `;
-    return;
-  }
-
-  try {
-    const response = await provider.connect();
-    const publicKey = response?.publicKey || provider.publicKey;
-    state.wallet = {
-      connected: Boolean(publicKey),
-      address: publicKey?.toString?.() || "",
-      provider: provider.isPhantom ? "Phantom" : "Solana Wallet",
-    };
-    renderWallet();
-  } catch (error) {
-    $("#walletBox").innerHTML = `<div class="notice">Wallet connection cancelled or failed: ${escapeHtml(error.message || "Unknown error")}</div>`;
-  }
-}
-
-async function fetchPremiumQuote() {
-  const quote = await api("/api/premium-quote");
-  state.premiumQuote = quote;
-  return quote;
-}
-
-function requireSolanaWeb3() {
-  if (!window.solanaWeb3) throw new Error("Solana web3 library did not load. Refresh the page and try again.");
-  return window.solanaWeb3;
-}
-
-function updatePaymentStep(message) {
-  state.paymentMessage = message;
-  renderPaymentPanel(message);
-}
-
-function withTimeout(promise, timeoutMs, label) {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`${label} timed out. Check the wallet popup or try again.`)), timeoutMs);
-    }),
-  ]);
-}
-
-function createIdempotentAtaInstruction(web3, associatedProgram, tokenProgram, payer, ata, owner, mint) {
-  return new web3.TransactionInstruction({
-    programId: associatedProgram,
-    keys: [
-      { pubkey: payer, isSigner: true, isWritable: true },
-      { pubkey: ata, isSigner: false, isWritable: true },
-      { pubkey: owner, isSigner: false, isWritable: false },
-      { pubkey: mint, isSigner: false, isWritable: false },
-      { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: tokenProgram, isSigner: false, isWritable: false },
-    ],
-    data: new Uint8Array([1]),
-  });
-}
-
-async function sendSwarmsPayment(quote, onStep = () => {}) {
-  const web3 = requireSolanaWeb3();
-  const provider = window.solana;
-  const connection = new web3.Connection(SOLANA_RPC_URL, "confirmed");
-  const owner = new web3.PublicKey(state.wallet.address);
-  const mint = new web3.PublicKey(quote.mint);
-  const treasury = new web3.PublicKey(quote.treasuryWallet);
-  const tokenProgram = new web3.PublicKey(TOKEN_PROGRAM_ID);
-  const associatedProgram = new web3.PublicKey(ASSOCIATED_TOKEN_PROGRAM_ID);
-
-  const [fromAta] = web3.PublicKey.findProgramAddressSync(
-    [owner.toBuffer(), tokenProgram.toBuffer(), mint.toBuffer()],
-    associatedProgram,
-  );
-  const [toAta] = web3.PublicKey.findProgramAddressSync(
-    [treasury.toBuffer(), tokenProgram.toBuffer(), mint.toBuffer()],
-    associatedProgram,
-  );
-
-  const amount = BigInt(quote.rawAmount);
-  const transaction = new web3.Transaction();
-  transaction.add(createIdempotentAtaInstruction(web3, associatedProgram, tokenProgram, owner, toAta, treasury, mint));
-
-  const data = new Uint8Array(9);
-  data[0] = 3;
-  new DataView(data.buffer).setBigUint64(1, amount, true);
-  transaction.add(
-    new web3.TransactionInstruction({
-      programId: tokenProgram,
-      keys: [
-        { pubkey: fromAta, isSigner: false, isWritable: true },
-        { pubkey: toAta, isSigner: false, isWritable: true },
-        { pubkey: owner, isSigner: true, isWritable: false },
-      ],
-      data,
-    }),
-  );
-
-  transaction.feePayer = owner;
-  onStep("Preparing Solana transaction...");
-  const latestBlockhash = await withTimeout(
-    connection.getLatestBlockhash("confirmed"),
-    12_000,
-    "Solana network preparation",
-  );
-  transaction.recentBlockhash = latestBlockhash.blockhash;
-
-  let signature;
-  onStep(`Opening wallet approval for ${tokenAmount(quote.tokenAmount)} $SWARMS...`);
-  if (provider.signTransaction) {
-    const signed = await withTimeout(provider.signTransaction(transaction), 120_000, "Wallet approval");
-    signature = await withTimeout(connection.sendRawTransaction(signed.serialize()), 20_000, "Payment submission");
-  } else if (provider.signAndSendTransaction) {
-    const result = await withTimeout(provider.signAndSendTransaction(transaction), 120_000, "Wallet approval");
-    signature = result.signature || result;
-  } else {
-    throw new Error("Connected wallet does not support transaction signing.");
-  }
-  onStep("Payment sent. Waiting for Solana confirmation...");
-  await withTimeout(
-    connection.confirmTransaction(
-      {
-        signature,
-        blockhash: latestBlockhash.blockhash,
-        lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
-      },
-      "confirmed",
-    ),
-    30_000,
-    "Payment confirmation",
-  );
-  return signature;
-}
-
-function paymentErrorMessage(error) {
-  const message = error?.message || "Unknown wallet error";
-  if (error?.code === 4001 || /reject|cancel/i.test(message)) {
-    return "Payment was cancelled in the wallet.";
-  }
-  return message;
-}
-
-async function unlockPremium() {
-  if (!state.wallet.connected) {
-    await connectWallet();
-    if (!state.wallet.connected) return;
-  }
-  state.paymentStatus = "pending";
-  state.paymentMessage = "Fetching live $SWARMS quote for $0.10...";
-  renderPremiumButtons();
-  renderPaymentPanel(state.paymentMessage);
-  $("#deskStatus").textContent = "Payment pending";
-  try {
-    const quote = await fetchPremiumQuote();
-    state.paymentMessage = `Approve ${tokenAmount(quote.tokenAmount)} $SWARMS to ${shortAddress(quote.treasuryWallet)}.`;
-    renderPaymentPanel(state.paymentMessage);
-    const signature = await sendSwarmsPayment(quote, updatePaymentStep);
-    state.paymentSignature = signature;
-    state.paymentStatus = "paid";
-    state.paymentMessage = "Premium Pro unlocked after confirmed $SWARMS transfer.";
-    state.premiumUnlocked = true;
-    $("#premiumMode").checked = true;
-    renderPremiumButtons();
-    renderGhostBack(state.latestCard?.ghostBack || premiumGhostBack());
-    renderPaymentPanel(state.paymentMessage);
-    $("#deskStatus").textContent = "Premium unlocked";
-  } catch (error) {
-    state.paymentStatus = "unpaid";
-    state.paymentMessage = `Payment failed: ${paymentErrorMessage(error)}`;
-    state.premiumUnlocked = false;
-    renderPremiumButtons();
-    renderPaymentPanel(state.paymentMessage);
-    $("#deskStatus").textContent = "Payment failed";
-  }
 }
 
 async function runSearch() {
@@ -654,7 +353,6 @@ async function runAnalysis(event) {
         reviewEngine: $("#reviewEngine").value,
         sourceMode: $("#sourceMode").value,
         publicMode: $("#cardMode").value === "public",
-        premiumMode: $("#premiumMode").checked || state.premiumUnlocked,
         notes: notesPayload(),
       }),
     });
@@ -712,10 +410,6 @@ $("#copyShare").addEventListener("click", async () => {
   }, 1100);
 });
 $("#exportCard").addEventListener("click", exportLatestCard);
-$("#connectWallet").addEventListener("click", connectWallet);
-$("#resultConnectWallet").addEventListener("click", connectWallet);
-$("#unlockPremium").addEventListener("click", unlockPremium);
-$("#sideUnlockPremium").addEventListener("click", unlockPremium);
 $("#heroRunScan")?.addEventListener("click", () => {
   openScanOverlay();
 });
@@ -739,5 +433,4 @@ $("#clearHistory").addEventListener("click", () => {
 });
 
 renderHistory();
-renderWallet();
 checkHealth();
