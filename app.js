@@ -9,10 +9,15 @@ const state = {
   },
   premiumUnlocked: false,
   paymentStatus: "unpaid",
+  premiumQuote: null,
+  paymentSignature: "",
 };
 
 const PREMIUM_FEE_USD = 0.1;
 const GHOSTBACK_RATE = 0.4;
+const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
+const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvoterCVicNWJvYsBpH4TtwTVNDC4eibZUU";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -30,6 +35,14 @@ function money(value) {
   if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(2)}M`;
   if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1)}K`;
   return `$${amount.toFixed(2)}`;
+}
+
+function tokenAmount(value) {
+  const amount = Number(value || 0);
+  if (amount >= 1_000_000) return amount.toLocaleString(undefined, { maximumFractionDigits: 0 });
+  if (amount >= 1_000) return amount.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  if (amount >= 1) return amount.toLocaleString(undefined, { maximumFractionDigits: 4 });
+  return amount.toLocaleString(undefined, { maximumFractionDigits: 8 });
 }
 
 function setLoading(isLoading) {
@@ -206,6 +219,7 @@ function premiumGhostBack() {
 
 function renderPaymentPanel(message = "") {
   const walletLabel = state.wallet.connected ? shortAddress(state.wallet.address) : "Not connected";
+  const quote = state.premiumQuote;
   const status =
     state.paymentStatus === "paid"
       ? "Paid"
@@ -214,10 +228,13 @@ function renderPaymentPanel(message = "") {
         : "Not paid";
   $("#paymentPanel").innerHTML = `
     <div class="quality-row"><span>Wallet</span><strong>${escapeHtml(walletLabel)}</strong></div>
-    <div class="quality-row"><span>Premium fee</span><strong>${money(PREMIUM_FEE_USD)} USDC</strong></div>
+    <div class="quality-row"><span>Premium fee</span><strong>${money(PREMIUM_FEE_USD)} in $SWARMS</strong></div>
+    <div class="quality-row"><span>$SWARMS due</span><strong>${quote?.tokenAmount ? tokenAmount(quote.tokenAmount) : "Quote on pay"}</strong></div>
+    <div class="quality-row"><span>Destination</span><strong>${escapeHtml(quote?.treasuryWallet ? shortAddress(quote.treasuryWallet) : "4ogw...haYE")}</strong></div>
     <div class="quality-row"><span>GhostBack</span><strong>${money(PREMIUM_FEE_USD * GHOSTBACK_RATE)}</strong></div>
     <div class="quality-row"><span>Status</span><strong>${escapeHtml(status)}</strong></div>
-    <p>${escapeHtml(message || "Connect a Solana wallet, then approve the Premium Pro unlock. Live USDC settlement can be connected through x402.")}</p>
+    ${state.paymentSignature ? `<div class="quality-row"><span>Signature</span><strong>${escapeHtml(shortAddress(state.paymentSignature))}</strong></div>` : ""}
+    <p>${escapeHtml(message || "Connect a Solana wallet, then approve a real $SWARMS transfer equivalent to $0.10.")}</p>
   `;
 }
 
@@ -443,6 +460,87 @@ async function connectWallet() {
   }
 }
 
+async function fetchPremiumQuote() {
+  const quote = await api("/api/premium-quote");
+  state.premiumQuote = quote;
+  return quote;
+}
+
+function requireSolanaWeb3() {
+  if (!window.solanaWeb3) throw new Error("Solana web3 library did not load. Refresh the page and try again.");
+  return window.solanaWeb3;
+}
+
+async function sendSwarmsPayment(quote) {
+  const web3 = requireSolanaWeb3();
+  const provider = window.solana;
+  const connection = new web3.Connection(SOLANA_RPC_URL, "confirmed");
+  const owner = new web3.PublicKey(state.wallet.address);
+  const mint = new web3.PublicKey(quote.mint);
+  const treasury = new web3.PublicKey(quote.treasuryWallet);
+  const tokenProgram = new web3.PublicKey(TOKEN_PROGRAM_ID);
+  const associatedProgram = new web3.PublicKey(ASSOCIATED_TOKEN_PROGRAM_ID);
+
+  const [fromAta] = web3.PublicKey.findProgramAddressSync(
+    [owner.toBuffer(), tokenProgram.toBuffer(), mint.toBuffer()],
+    associatedProgram,
+  );
+  const [toAta] = web3.PublicKey.findProgramAddressSync(
+    [treasury.toBuffer(), tokenProgram.toBuffer(), mint.toBuffer()],
+    associatedProgram,
+  );
+
+  const toAccount = await connection.getAccountInfo(toAta);
+  const transaction = new web3.Transaction();
+  if (!toAccount) {
+    transaction.add(
+      new web3.TransactionInstruction({
+        programId: associatedProgram,
+        keys: [
+          { pubkey: owner, isSigner: true, isWritable: true },
+          { pubkey: toAta, isSigner: false, isWritable: true },
+          { pubkey: treasury, isSigner: false, isWritable: false },
+          { pubkey: mint, isSigner: false, isWritable: false },
+          { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false },
+          { pubkey: tokenProgram, isSigner: false, isWritable: false },
+        ],
+        data: Buffer.alloc(0),
+      }),
+    );
+  }
+
+  const amount = BigInt(quote.rawAmount);
+  const data = new Uint8Array(9);
+  data[0] = 3;
+  new DataView(data.buffer).setBigUint64(1, amount, true);
+  transaction.add(
+    new web3.TransactionInstruction({
+      programId: tokenProgram,
+      keys: [
+        { pubkey: fromAta, isSigner: false, isWritable: true },
+        { pubkey: toAta, isSigner: false, isWritable: true },
+        { pubkey: owner, isSigner: true, isWritable: false },
+      ],
+      data,
+    }),
+  );
+
+  transaction.feePayer = owner;
+  const { blockhash } = await connection.getLatestBlockhash("confirmed");
+  transaction.recentBlockhash = blockhash;
+
+  let signature;
+  if (provider.signAndSendTransaction) {
+    const result = await provider.signAndSendTransaction(transaction);
+    signature = result.signature;
+  } else {
+    const signed = await provider.signTransaction(transaction);
+    signature = await connection.sendRawTransaction(signed.serialize());
+  }
+  await connection.confirmTransaction(signature, "confirmed");
+  return signature;
+}
+
 async function unlockPremium() {
   if (!state.wallet.connected) {
     await connectWallet();
@@ -450,18 +548,27 @@ async function unlockPremium() {
   }
   state.paymentStatus = "pending";
   renderPremiumButtons();
-  renderPaymentPanel("Wallet connected. Approving simulated $0.10 USDC Premium unlock...");
+  renderPaymentPanel("Fetching live $SWARMS quote for $0.10...");
   $("#deskStatus").textContent = "Payment pending";
-
-  window.setTimeout(() => {
+  try {
+    const quote = await fetchPremiumQuote();
+    renderPaymentPanel(`Approve ${tokenAmount(quote.tokenAmount)} $SWARMS to ${shortAddress(quote.treasuryWallet)}.`);
+    const signature = await sendSwarmsPayment(quote);
+    state.paymentSignature = signature;
     state.paymentStatus = "paid";
     state.premiumUnlocked = true;
     $("#premiumMode").checked = true;
     renderPremiumButtons();
     renderGhostBack(state.latestCard?.ghostBack || premiumGhostBack());
-    renderPaymentPanel("Premium Pro unlocked. Payment is simulated locally; connect x402/USDC settlement before production.");
+    renderPaymentPanel("Premium Pro unlocked after confirmed $SWARMS transfer.");
     $("#deskStatus").textContent = "Premium unlocked";
-  }, 700);
+  } catch (error) {
+    state.paymentStatus = "unpaid";
+    state.premiumUnlocked = false;
+    renderPremiumButtons();
+    renderPaymentPanel(`Payment failed or cancelled: ${error.message}`);
+    $("#deskStatus").textContent = "Payment failed";
+  }
 }
 
 async function runSearch() {

@@ -31,6 +31,11 @@ const swarmsApiKey = process.env.SWARMS_API_KEY || "";
 const swarmsModel = process.env.SWARMS_MODEL || "gpt-4o-mini";
 const swarmsBaseUrl = process.env.SWARMS_BASE_URL || "https://api.swarms.world";
 const swarmsMode = process.env.SWARMS_MODE || "swarm";
+const premiumUsd = Number(process.env.PREMIUM_USD || "0.1");
+const swarmsMint = process.env.SWARMS_TOKEN_MINT || "74SBV4zDXxTRgv1pEMoECskKBkZHc2yGPnc7GYVepump";
+const swarmsDecimals = Number(process.env.SWARMS_TOKEN_DECIMALS || "6");
+const premiumTreasuryWallet =
+  process.env.PREMIUM_TREASURY_WALLET || "4ogwVdsKTyCKB9mowj5QyehhCpiQE5FsijG8gcL5haYE";
 const ghostveilPromptPath = path.join(root, "agent", "system_prompt.md");
 
 const types = {
@@ -545,6 +550,40 @@ async function fetchDexScreener(query) {
   }
 }
 
+async function getPremiumQuote() {
+  const result = await fetchDexScreener(swarmsMint);
+  const pair =
+    result.pairs.find((item) => item.baseToken?.address === swarmsMint || item.quoteToken?.address === swarmsMint) ||
+    result.pairs[0];
+  const priceUsd = number(pair?.priceUsd);
+  if (!priceUsd) {
+    return {
+      ok: false,
+      error: "Unable to quote $SWARMS price from DexScreener.",
+      premiumUsd,
+      mint: swarmsMint,
+      treasuryWallet: premiumTreasuryWallet,
+      decimals: swarmsDecimals,
+    };
+  }
+
+  const tokenAmount = premiumUsd / priceUsd;
+  const rawAmount = Math.ceil(tokenAmount * 10 ** swarmsDecimals).toString();
+  return {
+    ok: true,
+    premiumUsd,
+    symbol: "$SWARMS",
+    mint: swarmsMint,
+    decimals: swarmsDecimals,
+    treasuryWallet: premiumTreasuryWallet,
+    priceUsd,
+    tokenAmount,
+    rawAmount,
+    pairUrl: pair?.url || null,
+    quotedAt: new Date().toISOString(),
+  };
+}
+
 function analyzeSignal({ query, pair, notes = {}, publicMode = true, premiumMode = false, connectorError = null }) {
   const walletNotes = parseNotes(notes.wallet);
   const liquidityNotes = parseNotes(notes.liquidity);
@@ -835,6 +874,12 @@ async function handleApi(req, res, url) {
       warning: result.error,
       pairs: result.pairs,
     });
+    return;
+  }
+
+  if (req.method === "GET" && url.pathname === "/api/premium-quote") {
+    const quote = await getPremiumQuote();
+    sendJson(res, quote.ok ? 200 : 502, quote);
     return;
   }
 

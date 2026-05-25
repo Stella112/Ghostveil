@@ -4,6 +4,11 @@ const path = require("path");
 const swarmsModel = process.env.SWARMS_MODEL || "gpt-4o-mini";
 const swarmsBaseUrl = process.env.SWARMS_BASE_URL || "https://api.swarms.world";
 const swarmsMode = process.env.SWARMS_MODE || "swarm";
+const premiumUsd = Number(process.env.PREMIUM_USD || "0.1");
+const swarmsMint = process.env.SWARMS_TOKEN_MINT || "74SBV4zDXxTRgv1pEMoECskKBkZHc2yGPnc7GYVepump";
+const swarmsDecimals = Number(process.env.SWARMS_TOKEN_DECIMALS || "6");
+const premiumTreasuryWallet =
+  process.env.PREMIUM_TREASURY_WALLET || "4ogwVdsKTyCKB9mowj5QyehhCpiQE5FsijG8gcL5haYE";
 
 function clamp(value, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(value)));
@@ -194,6 +199,40 @@ async function fetchDexScreener(query) {
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function getPremiumQuote() {
+  const result = await fetchDexScreener(swarmsMint);
+  const pair =
+    result.pairs.find((item) => item.baseToken?.address === swarmsMint || item.quoteToken?.address === swarmsMint) ||
+    result.pairs[0];
+  const priceUsd = number(pair?.priceUsd);
+  if (!priceUsd) {
+    return {
+      ok: false,
+      error: "Unable to quote $SWARMS price from DexScreener.",
+      premiumUsd,
+      mint: swarmsMint,
+      treasuryWallet: premiumTreasuryWallet,
+      decimals: swarmsDecimals,
+    };
+  }
+
+  const tokenAmount = premiumUsd / priceUsd;
+  const rawAmount = Math.ceil(tokenAmount * 10 ** swarmsDecimals).toString();
+  return {
+    ok: true,
+    premiumUsd,
+    symbol: "$SWARMS",
+    mint: swarmsMint,
+    decimals: swarmsDecimals,
+    treasuryWallet: premiumTreasuryWallet,
+    priceUsd,
+    tokenAmount,
+    rawAmount,
+    pairUrl: pair?.url || null,
+    quotedAt: new Date().toISOString(),
+  };
 }
 
 function getGhostveilSystemPrompt() {
@@ -663,6 +702,7 @@ async function runSwarmsReview({ query, pair, notes, publicMode, premiumMode, lo
 module.exports = {
   analyzeSignal,
   fetchDexScreener,
+  getPremiumQuote,
   mergeSwarmsAlphaCard,
   runSwarmsReview,
 };
