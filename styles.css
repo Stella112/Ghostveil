@@ -626,7 +626,8 @@ textarea {
 
 .premium-access,
 .ai-desk,
-.manual-evidence {
+.manual-evidence,
+.payment-panel {
   background: rgba(255, 255, 255, 0.028);
   border: 1px solid var(--line);
   margin-top: 14px;
@@ -668,6 +669,18 @@ textarea {
   color: var(--text);
   font-weight: 900;
   min-height: 44px;
+}
+
+.payment-panel {
+  display: grid;
+  gap: 10px;
+}
+
+.payment-panel p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  margin: 0;
 }
 
 .ai-desk-grid {

@@ -773,13 +773,13 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, premiumMode
     },
     ghostBack: premiumMode
       ? {
-          premiumFeeUsd: 1,
-          rewardPoolUsd: 0.4,
+          premiumFeeUsd: 0.1,
+          rewardPoolUsd: 0.04,
           fundedBy: "Premium Signal revenue, not token trading fees",
           splits: {
-            signalScouts: 0.16,
-            alphaValidators: 0.14,
-            cardDistributors: 0.1,
+            signalScouts: 0.016,
+            alphaValidators: 0.014,
+            cardDistributors: 0.01,
           },
         }
       : null,

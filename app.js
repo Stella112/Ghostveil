@@ -8,7 +8,11 @@ const state = {
     provider: "",
   },
   premiumUnlocked: false,
+  paymentStatus: "unpaid",
 };
+
+const PREMIUM_FEE_USD = 0.1;
+const GHOSTBACK_RATE = 0.4;
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -191,19 +195,38 @@ function renderAiDesk(result) {
 }
 
 function premiumGhostBack() {
+  const rewardPoolUsd = PREMIUM_FEE_USD * GHOSTBACK_RATE;
   return {
-    premiumFeeUsd: 1,
-    rewardPoolUsd: 0.4,
+    premiumFeeUsd: PREMIUM_FEE_USD,
+    rewardPoolUsd,
     fundedBy: "Premium Signal revenue, not token trading fees",
-    splits: { signalScouts: 0.16, alphaValidators: 0.14, cardDistributors: 0.1 },
+    splits: { signalScouts: 0.016, alphaValidators: 0.014, cardDistributors: 0.01 },
   };
 }
 
+function renderPaymentPanel(message = "") {
+  const walletLabel = state.wallet.connected ? shortAddress(state.wallet.address) : "Not connected";
+  const status =
+    state.paymentStatus === "paid"
+      ? "Paid"
+      : state.paymentStatus === "pending"
+        ? "Awaiting wallet approval"
+        : "Not paid";
+  $("#paymentPanel").innerHTML = `
+    <div class="quality-row"><span>Wallet</span><strong>${escapeHtml(walletLabel)}</strong></div>
+    <div class="quality-row"><span>Premium fee</span><strong>${money(PREMIUM_FEE_USD)} USDC</strong></div>
+    <div class="quality-row"><span>GhostBack</span><strong>${money(PREMIUM_FEE_USD * GHOSTBACK_RATE)}</strong></div>
+    <div class="quality-row"><span>Status</span><strong>${escapeHtml(status)}</strong></div>
+    <p>${escapeHtml(message || "Connect a Solana wallet, then approve the Premium Pro unlock. Live USDC settlement can be connected through x402.")}</p>
+  `;
+}
+
 function renderPremiumButtons() {
-  const label = state.premiumUnlocked ? "Premium Ready" : "Pay $1 Premium";
+  const label = state.premiumUnlocked ? "Premium Ready" : "Pay $0.10 Premium";
   $("#unlockPremium").textContent = label;
-  $("#sideUnlockPremium").textContent = state.premiumUnlocked ? "Premium Ready" : "Connect Wallet + Pay $1";
+  $("#sideUnlockPremium").textContent = state.premiumUnlocked ? "Premium Ready" : "Connect Wallet + Pay $0.10";
   $("#premiumMode").checked = state.premiumUnlocked;
+  renderPaymentPanel();
 }
 
 function renderAlphaCard(result) {
@@ -376,6 +399,8 @@ function renderWallet() {
         await window.solana?.disconnect?.();
       } catch {}
       state.wallet = { connected: false, address: "", provider: "" };
+      state.paymentStatus = "unpaid";
+      state.premiumUnlocked = false;
       renderWallet();
       renderPremiumButtons();
     });
@@ -423,11 +448,20 @@ async function unlockPremium() {
     await connectWallet();
     if (!state.wallet.connected) return;
   }
-  state.premiumUnlocked = true;
-  $("#premiumMode").checked = true;
+  state.paymentStatus = "pending";
   renderPremiumButtons();
-  renderGhostBack(state.latestCard?.ghostBack || premiumGhostBack());
-  $("#deskStatus").textContent = "Premium unlocked";
+  renderPaymentPanel("Wallet connected. Approving simulated $0.10 USDC Premium unlock...");
+  $("#deskStatus").textContent = "Payment pending";
+
+  window.setTimeout(() => {
+    state.paymentStatus = "paid";
+    state.premiumUnlocked = true;
+    $("#premiumMode").checked = true;
+    renderPremiumButtons();
+    renderGhostBack(state.latestCard?.ghostBack || premiumGhostBack());
+    renderPaymentPanel("Premium Pro unlocked. Payment is simulated locally; connect x402/USDC settlement before production.");
+    $("#deskStatus").textContent = "Premium unlocked";
+  }, 700);
 }
 
 async function runSearch() {
