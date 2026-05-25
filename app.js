@@ -385,6 +385,10 @@ $("#copyShare").addEventListener("click", async () => {
 });
 $("#exportCard").addEventListener("click", exportLatestCard);
 $("#connectWallet").addEventListener("click", connectWallet);
+$("#heroRunScan")?.addEventListener("click", () => {
+  document.querySelector("#scan")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  setTimeout(() => $("#queryInput")?.focus(), 500);
+});
 $("#clearHistory").addEventListener("click", () => {
   state.history = [];
   localStorage.removeItem("ghostveil-history");
