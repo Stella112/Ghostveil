@@ -42,6 +42,12 @@ module.exports = async function handler(req, res) {
         localResult: result,
       });
       const merged = mergeSwarmsAlphaCard(result, swarmsReview.parsed);
+      if (swarmsReview.status === "ok" && merged.alphaCard?.signalRoute && !merged.alphaCard.signalRoute.includes("Swarms")) {
+        merged.alphaCard.signalRoute = merged.alphaCard.signalRoute.replace(
+          "GhostVeil local precheck",
+          "GhostVeil local precheck -> Swarms multi-agent swarm",
+        );
+      }
       res.status(200).json({
         ...merged,
         reviewEngine: swarmsReview.status === "ok" ? "swarms" : "local",

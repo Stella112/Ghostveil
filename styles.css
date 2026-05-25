@@ -692,9 +692,18 @@ textarea {
   padding-bottom: 18px;
 }
 
+.card-header h2 {
+  font-size: clamp(42px, 6vw, 82px);
+}
+
+.verdict-stack {
+  display: grid;
+  gap: 10px;
+  min-width: 190px;
+}
+
 .verdict-box {
   border: 1px solid rgba(32, 230, 143, 0.28);
-  min-width: 160px;
   padding: 14px;
   text-align: right;
 }
@@ -708,6 +717,54 @@ textarea {
 
 .verdict-box small {
   color: var(--muted);
+}
+
+.rating-box {
+  background: rgba(154, 77, 255, 0.08);
+  border: 1px solid rgba(154, 77, 255, 0.28);
+  padding: 14px;
+  text-align: right;
+}
+
+.rating-box span {
+  color: var(--purple);
+  display: block;
+  font-size: 34px;
+  font-weight: 950;
+  line-height: 1;
+}
+
+.rating-box small,
+.signal-meta-grid span {
+  color: var(--muted);
+}
+
+.signal-meta-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-bottom: 18px;
+}
+
+.signal-meta-grid div {
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--line);
+  padding: 13px;
+}
+
+.signal-meta-grid span {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 10px;
+  margin-bottom: 7px;
+  text-transform: uppercase;
+}
+
+.signal-meta-grid strong {
+  display: block;
+  font-size: 13px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .score-grid {
@@ -1460,6 +1517,7 @@ textarea {
   .button-row,
   .mode-grid,
   .mini-scores,
+  .signal-meta-grid,
   .score-grid,
   .evidence-grid,
   .review-grid,

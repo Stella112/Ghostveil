@@ -104,6 +104,18 @@ function setScore(name, value) {
   $(`#${name}Bar`).style.width = `${value}%`;
 }
 
+function formatDateTime(value) {
+  if (!value) return "Not provided";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function verdictTone(value) {
   const text = String(value || "").toLowerCase();
   if (text.includes("approved") || text.includes("candidate") || text.includes("pass")) return "pass";
@@ -173,6 +185,15 @@ function renderAlphaCard(result) {
   $("#marketNarrative").textContent = card.marketNarrative;
   $("#finalVerdict").textContent = card.finalVerdict;
   $("#currentStage").textContent = card.currentStage;
+  $("#alphaRating").textContent = card.alphaRating || "--";
+  $("#signalRoute").textContent = card.signalRoute || "Input -> DexScreener -> GhostVeil -> Verdict";
+  $("#xPostedAt").textContent = card.socialContext?.xPostedAt
+    ? formatDateTime(card.socialContext.xPostedAt)
+    : card.socialContext?.xStatus === "not_provided"
+      ? "No X post provided"
+      : "Needs confirmation";
+  $("#detectedAt").textContent = formatDateTime(card.detectedAt || result.generatedAt);
+  $("#sourceRating").textContent = card.sourceRating || "--";
   $("#whyItMatters").textContent = card.whyItMattersNow;
   $("#nextSteps").textContent = card.suggestedNextSteps;
   $("#shareSummary").textContent = card.shareableSummary;

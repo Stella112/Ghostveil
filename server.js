@@ -78,6 +78,60 @@ function formatAge(hours) {
   return `${(hours / 24).toFixed(1)} days`;
 }
 
+function alphaRatingFromScores(ghostProof, risk) {
+  if (risk >= 82) return "F";
+  if (ghostProof >= 82 && risk < 45) return "A";
+  if (ghostProof >= 70 && risk < 60) return "B";
+  if (ghostProof >= 55) return "C";
+  if (ghostProof >= 40) return "D";
+  return "F";
+}
+
+function sourceRating({ pair, socialContext, directEvidenceCount }) {
+  let score = 45;
+  if (pair) score += 25;
+  if (socialContext?.xPostedAt) score += 15;
+  if (directEvidenceCount >= 4) score += 10;
+  if (!pair) score -= 15;
+  score = clamp(score);
+  if (score >= 85) return "A";
+  if (score >= 70) return "B";
+  if (score >= 55) return "C";
+  if (score >= 40) return "D";
+  return "F";
+}
+
+function extractXPostMeta(...values) {
+  const text = values.filter(Boolean).join("\n");
+  const urlMatch = text.match(/https?:\/\/(?:www\.)?(?:x|twitter)\.com\/[^/\s]+\/status\/(\d+)/i);
+  const id = urlMatch?.[1];
+  if (!id) {
+    return {
+      xStatus: "not_provided",
+      xUrl: null,
+      xPostId: null,
+      xPostedAt: null,
+      note: "No X/Twitter post URL was provided. Social timing cannot be verified.",
+    };
+  }
+
+  let postedAt = null;
+  try {
+    const timestamp = Number((BigInt(id) >> 22n) + 1288834974657n);
+    if (Number.isFinite(timestamp)) postedAt = new Date(timestamp).toISOString();
+  } catch {}
+
+  return {
+    xStatus: postedAt ? "decoded_from_status_id" : "found_needs_confirmation",
+    xUrl: urlMatch[0],
+    xPostId: id,
+    xPostedAt: postedAt,
+    note: postedAt
+      ? "X post time decoded from the public status ID. Engagement and author quality still need confirmation."
+      : "X post URL found, but timestamp could not be decoded.",
+  };
+}
+
 function stageFromScores(stealth, risk, age) {
   if (risk >= 78) return "Exit-Liquidity Risk";
   if (stealth <= 35) return "Crowded";
@@ -168,6 +222,18 @@ function buildSwarmsTask({ query, pair, notes, publicMode, premiumMode, localRes
         signalName: "string",
         marketNarrative: "string",
         currentStage: "Hidden | Emerging | Crowded | Exit-Liquidity Risk | Needs Confirmation",
+        alphaRating: "A | B | C | D | F",
+        sourceRating: "A | B | C | D | F",
+        detectedAt: "ISO datetime",
+        firstSeenAt: "ISO datetime or null",
+        signalRoute: "string route showing input -> sources -> agents -> verdict",
+        socialContext: {
+          xStatus: "not_provided | decoded_from_status_id | found_needs_confirmation",
+          xUrl: "string or null",
+          xPostId: "string or null",
+          xPostedAt: "ISO datetime or null",
+          note: "string",
+        },
         scores: {
           stealth: "number 0-100",
           conviction: "number 0-100",
@@ -552,6 +618,8 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, premiumMode
   const ghostProof = clamp(stealth * 0.24 + conviction * 0.46 + (100 - risk) * 0.3);
   const currentStage = stageFromScores(stealth, risk, age);
   const finalVerdict = verdictFromScores(ghostProof, risk, conviction);
+  const socialContext = extractXPostMeta(query, notes.social, notes.narrative);
+  const alphaRating = alphaRatingFromScores(ghostProof, risk);
 
   const directEvidence = [];
   if (pair) {
@@ -563,6 +631,16 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, premiumMode
   } else {
     directEvidence.push("No live market pair was connected. Analysis is based only on user-provided evidence.");
   }
+  directEvidence.push(socialContext.note);
+
+  const route = [
+    "User input",
+    pair ? "DexScreener Solana pair" : "Provided-data mode",
+    socialContext.xPostedAt ? "X timestamp decoded" : "X timing missing",
+    "GhostVeil local precheck",
+    "Alpha Tribunal verdict",
+  ].join(" -> ");
+  const rating = sourceRating({ pair, socialContext, directEvidenceCount: directEvidence.length });
 
   const assumptions = [];
   if (walletNotes.length) assumptions.push("Wallet evidence is based on user notes and needs independent verification.");
@@ -578,7 +656,7 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, premiumMode
         ? [`Observed liquidity: ${money(liq)}. Volume/liquidity ratio: ${volumeToLiquidity.toFixed(2)}.`]
         : ["No liquidity evidence provided or connected."],
     narrative: narrativeNotes.length ? narrativeNotes : ["No narrative notes provided."],
-    socialMomentum: socialNotes.length ? socialNotes : ["No social momentum notes provided."],
+    socialMomentum: socialNotes.length ? [...socialNotes, socialContext.note] : [socialContext.note],
     counterSignals: counterNotes.length
       ? counterNotes
       : risk >= 65
@@ -651,6 +729,12 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, premiumMode
       signalName,
       marketNarrative: pair ? `Solana ${dex} market signal` : "User-provided Solana market signal",
       currentStage,
+      alphaRating,
+      sourceRating: rating,
+      detectedAt: new Date().toISOString(),
+      firstSeenAt: pair?.pairCreatedAt ? new Date(pair.pairCreatedAt).toISOString() : null,
+      signalRoute: route,
+      socialContext,
       scores: {
         stealth,
         conviction,
@@ -658,8 +742,8 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, premiumMode
         ghostProof,
       },
       whyItMattersNow: pair
-        ? `GhostVeil found current Solana market context for ${tokenName}. The signal is scored from liquidity, volume, transaction flow, age, risk factors, and any evidence supplied by the user.`
-        : "GhostVeil can structure the signal and risk review, but live Solana data is not connected for this request.",
+        ? `GhostVeil found current Solana market context for ${tokenName}. The signal is scored from liquidity, volume, transaction flow, age, risk factors, and any evidence supplied by the user. ${socialContext.xPostedAt ? `The linked X post appears to have been posted at ${socialContext.xPostedAt}.` : "No X post URL was provided, so social timing is not verified."}`
+        : `GhostVeil can structure the signal and risk review, but live Solana data is not connected for this request. ${socialContext.xPostedAt ? `The linked X post appears to have been posted at ${socialContext.xPostedAt}.` : "No X post URL was provided, so social timing is not verified."}`,
       evidenceTrail,
       alphaTribunal,
       veilGuardPrivacyCheck: {
@@ -785,6 +869,12 @@ async function handleApi(req, res, url) {
           localResult: result,
         });
         const merged = mergeSwarmsAlphaCard(result, swarmsReview.parsed);
+        if (swarmsReview.status === "ok" && merged.alphaCard?.signalRoute && !merged.alphaCard.signalRoute.includes("Swarms")) {
+          merged.alphaCard.signalRoute = merged.alphaCard.signalRoute.replace(
+            "GhostVeil local precheck",
+            "GhostVeil local precheck -> Swarms multi-agent swarm",
+          );
+        }
         sendJson(res, 200, {
           ...merged,
           reviewEngine: swarmsReview.status === "ok" ? "swarms" : "local",

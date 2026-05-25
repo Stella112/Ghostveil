@@ -305,11 +305,23 @@
                   <h2 id="signalName"></h2>
                   <p id="marketNarrative"></p>
                 </div>
-                <div class="verdict-box">
-                  <span id="finalVerdict"></span>
-                  <small id="currentStage"></small>
+                <div class="verdict-stack">
+                  <div class="verdict-box">
+                    <span id="finalVerdict"></span>
+                    <small id="currentStage"></small>
+                  </div>
+                  <div class="rating-box">
+                    <span id="alphaRating">--</span>
+                    <small>Alpha Rating</small>
+                  </div>
                 </div>
               </header>
+              <section class="signal-meta-grid" aria-label="Signal metadata">
+                <div><span>Signal Route</span><strong id="signalRoute">Awaiting route</strong></div>
+                <div><span>X Posted</span><strong id="xPostedAt">No X post provided</strong></div>
+                <div><span>Detected</span><strong id="detectedAt">Awaiting scan</strong></div>
+                <div><span>Source Rating</span><strong id="sourceRating">--</strong></div>
+              </section>
               <section class="signal-reactor" aria-label="GhostVeil signal reactor">
                 <div class="reactor-top">
                   <div>
