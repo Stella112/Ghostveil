@@ -122,6 +122,16 @@ DexScreener search does not require an API key.
 npm run check
 ```
 
+## Integration Smoke Test
+
+After adding `SWARMS_API_KEY` to `.env`, run:
+
+```bash
+npm run test:api
+```
+
+This checks DexScreener market context, local GhostVeil scoring, Swarms Agent Completions, and the final Alpha Card merge.
+
 ## Swarms Agent Package
 
 - `agent/ghostveil_oracle_swarm.py`: Swarms-ready agent workflow scaffold

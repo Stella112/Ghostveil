@@ -227,6 +227,11 @@ function extractTextFromSwarmsPayload(payload) {
   if (typeof payload === "string") return payload;
   if (!payload || typeof payload !== "object") return "";
 
+  if (Array.isArray(payload.outputs) && payload.outputs.length) {
+    const output = payload.outputs.find((item) => typeof item?.content === "string");
+    if (output) return output.content;
+  }
+
   const candidates = [
     payload.output,
     payload.response,
