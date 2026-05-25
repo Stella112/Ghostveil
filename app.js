@@ -104,6 +104,50 @@ function setScore(name, value) {
   $(`#${name}Bar`).style.width = `${value}%`;
 }
 
+function verdictTone(value) {
+  const text = String(value || "").toLowerCase();
+  if (text.includes("approved") || text.includes("candidate") || text.includes("pass")) return "pass";
+  if (text.includes("reject") || text.includes("risk")) return "risk";
+  return "watch";
+}
+
+function renderSignalReactor(card, result) {
+  const scores = card.scores || {};
+  const agents = [
+    ["VeilSense", "Signal scan", `Stealth ${scores.stealth}/100`],
+    ["Bull Agent", "Upside case", card.alphaTribunal?.bullCase || "Review complete."],
+    ["Bear Agent", "Invalidation case", card.alphaTribunal?.bearCase || "Review complete."],
+    ["VeilGuard", "Privacy pass", card.veilGuardPrivacyCheck?.privacyRiskLevel || "Low"],
+    ["GhostProof", "Final lock", card.finalVerdict || "Watchlist"],
+  ];
+
+  $("#reactorHeadline").textContent = `${card.signalName} / ${card.currentStage}`;
+  $("#signalPulse").textContent =
+    result.reviewEngine === "swarms" ? "SWARM VERIFIED" : "LOCAL PRECHECK";
+
+  [
+    ["reactorStealth", scores.stealth],
+    ["reactorConviction", scores.conviction],
+    ["reactorRisk", scores.risk],
+    ["reactorGhostProof", scores.ghostProof],
+  ].forEach(([id, value]) => {
+    $(`#${id}`).style.width = `${Number(value || 0)}%`;
+  });
+
+  $("#agentTrace").innerHTML = agents
+    .map(([name, role, output]) => {
+      const tone = verdictTone(`${output} ${card.finalVerdict}`);
+      return `
+        <article class="${tone}">
+          <span>${escapeHtml(role)}</span>
+          <strong>${escapeHtml(name)}</strong>
+          <p>${escapeHtml(String(output)).slice(0, 160)}</p>
+        </article>
+      `;
+    })
+    .join("");
+}
+
 function renderKeyValue(container, entries) {
   container.innerHTML = entries
     .map(
@@ -138,6 +182,7 @@ function renderAlphaCard(result) {
   setScore("conviction", card.scores.conviction);
   setScore("risk", card.scores.risk);
   setScore("ghostProof", card.scores.ghostProof);
+  renderSignalReactor(card, result);
 
   renderKeyValue($("#evidenceTrail"), [
     ["Wallet Evidence", card.evidenceTrail.wallet],
@@ -371,11 +416,11 @@ function exportLatestCard() {
 async function checkHealth() {
   try {
     const payload = await api("/api/health");
-    const swarmsText = payload.swarms?.configured ? "Swarms API connected" : "Swarms key needed";
+    const swarmsText = payload.swarms?.configured ? `Swarms ${payload.swarms.mode || "swarm"} connected` : "Swarms key needed";
     $("#healthStatus").textContent = payload.ok ? "SOLANA_MAINNET" : "Connector unavailable";
     $("#healthStatus").title = payload.ok ? `DexScreener ready / ${swarmsText}` : "Connector unavailable";
     const swarmsOption = $("#reviewEngine").querySelector('option[value="swarms"]');
-    swarmsOption.textContent = payload.swarms?.configured ? "Swarms API agent" : "Swarms API agent (needs key)";
+    swarmsOption.textContent = payload.swarms?.configured ? "Swarms multi-agent swarm" : "Swarms swarm (needs key)";
   } catch {
     $("#healthStatus").textContent = "Connector unavailable";
   }

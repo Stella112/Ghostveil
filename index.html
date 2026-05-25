@@ -55,6 +55,14 @@
           <h2>Protocol: Mirai Finance</h2>
           <p class="muted">CA: Mira...8KqP - detected 14m ago</p>
           <div class="token-chip">MIRAI</div>
+          <div class="signal-flare" aria-label="Live signal pulse">
+            <span>Live Signal Pulse</span>
+            <i style="--level: 94%"></i>
+            <i style="--level: 72%"></i>
+            <i style="--level: 88%"></i>
+            <i style="--level: 61%"></i>
+            <i style="--level: 96%"></i>
+          </div>
           <div class="mini-scores">
             <div><span>Stealth</span><strong>94</strong></div>
             <div><span>Conviction</span><strong>High</strong></div>
@@ -224,7 +232,7 @@
                   Review Engine
                   <select id="reviewEngine">
                     <option value="local" selected>Local GhostVeil rules</option>
-                    <option value="swarms">Swarms API agent</option>
+                    <option value="swarms">Swarms multi-agent swarm</option>
                   </select>
                 </label>
                 <label>
@@ -302,6 +310,22 @@
                   <small id="currentStage"></small>
                 </div>
               </header>
+              <section class="signal-reactor" aria-label="GhostVeil signal reactor">
+                <div class="reactor-top">
+                  <div>
+                    <p class="eyebrow">Signal Reactor</p>
+                    <strong id="reactorHeadline">Swarm verdict forming</strong>
+                  </div>
+                  <span id="signalPulse">LIVE SIGNAL</span>
+                </div>
+                <div class="reactor-grid">
+                  <div><span>Stealth Pulse</span><i id="reactorStealth"></i></div>
+                  <div><span>Conviction Heat</span><i id="reactorConviction"></i></div>
+                  <div><span>Risk Static</span><i id="reactorRisk"></i></div>
+                  <div><span>GhostProof Lock</span><i id="reactorGhostProof"></i></div>
+                </div>
+                <div id="agentTrace" class="agent-trace"></div>
+              </section>
               <div class="score-grid">
                 <div class="score"><span id="stealthScore">0</span><p>Stealth</p><i id="stealthBar"></i></div>
                 <div class="score"><span id="convictionScore">0</span><p>Conviction</p><i id="convictionBar"></i></div>

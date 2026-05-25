@@ -3,6 +3,7 @@ const path = require("path");
 
 const swarmsModel = process.env.SWARMS_MODEL || "gpt-4o-mini";
 const swarmsBaseUrl = process.env.SWARMS_BASE_URL || "https://api.swarms.world";
+const swarmsMode = process.env.SWARMS_MODE || "swarm";
 
 function clamp(value, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(value)));
@@ -387,6 +388,48 @@ function buildSwarmsTask({ query, pair, notes, publicMode, premiumMode, localRes
   );
 }
 
+function buildGhostVeilAgents() {
+  const basePrompt = getGhostveilSystemPrompt();
+  return [
+    {
+      agent_name: "VeilSense Signal Scout",
+      description: "Finds early Solana market signals and grades stealth, liquidity, wallet, and narrative clues.",
+      system_prompt: `${basePrompt}\n\nYou are VeilSense. Focus only on observed signal discovery, timing, stealth, and source quality.`,
+      model_name: swarmsModel,
+      temperature: 0.18,
+      max_tokens: 1800,
+      max_loops: 1,
+    },
+    {
+      agent_name: "Alpha Tribunal Bear Judge",
+      description: "Attacks the signal, finds invalidation risks, and rejects weak or crowded setups.",
+      system_prompt: `${basePrompt}\n\nYou are the Alpha Tribunal Bear Judge. Focus on what could be wrong, crowded, manipulated, unsafe, or unsupported.`,
+      model_name: swarmsModel,
+      temperature: 0.18,
+      max_tokens: 1800,
+      max_loops: 1,
+    },
+    {
+      agent_name: "VeilGuard Privacy Sentinel",
+      description: "Sanitizes public output and removes sensitive wallet intent, sizing, and strategy details.",
+      system_prompt: `${basePrompt}\n\nYou are VeilGuard. Focus on privacy, public-safe summaries, and removing trader intent or sensitive execution details.`,
+      model_name: swarmsModel,
+      temperature: 0.12,
+      max_tokens: 1500,
+      max_loops: 1,
+    },
+    {
+      agent_name: "GhostProof Final Card Writer",
+      description: "Synthesizes the swarm into one strict JSON GhostVeil Alpha Card.",
+      system_prompt: `${basePrompt}\n\nYou are GhostProof. Return only strict JSON matching the GhostVeil Alpha Card shape. Do not add markdown.`,
+      model_name: swarmsModel,
+      temperature: 0.12,
+      max_tokens: 3000,
+      max_loops: 1,
+    },
+  ];
+}
+
 function extractTextFromSwarmsPayload(payload) {
   if (typeof payload === "string") return payload;
   if (!payload || typeof payload !== "object") return "";
@@ -480,25 +523,39 @@ async function runSwarmsReview({ query, pair, notes, publicMode, premiumMode, lo
     };
   }
 
-  const response = await fetch(`${swarmsBaseUrl}/v1/agent/completions`, {
+  const task = buildSwarmsTask({ query, pair, notes, publicMode, premiumMode, localResult });
+  const useSwarm = swarmsMode !== "agent";
+  const response = await fetch(`${swarmsBaseUrl}${useSwarm ? "/v1/swarm/completions" : "/v1/agent/completions"}`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       "x-api-key": process.env.SWARMS_API_KEY,
     },
-    body: JSON.stringify({
-      agent_config: {
-        agent_name: "GhostVeil Oracle Swarm",
-        description:
-          "Solana market intelligence agent that verifies signals, separates evidence from assumptions, protects trader intent, and returns risk-aware Alpha Cards.",
-        system_prompt: getGhostveilSystemPrompt(),
-        model_name: swarmsModel,
-        temperature: 0.2,
-        max_tokens: 3000,
-        max_loops: 1,
-      },
-      task: buildSwarmsTask({ query, pair, notes, publicMode, premiumMode, localResult }),
-    }),
+    body: JSON.stringify(
+      useSwarm
+        ? {
+            name: "GhostVeil Oracle Swarm",
+            description:
+              "A Solana alpha verification swarm with VeilSense, Alpha Tribunal, VeilGuard, and GhostProof agents.",
+            swarm_type: "MixtureOfAgents",
+            max_loops: 1,
+            agents: buildGhostVeilAgents(),
+            task,
+          }
+        : {
+            agent_config: {
+              agent_name: "GhostVeil Oracle Swarm",
+              description:
+                "Solana market intelligence agent that verifies signals, separates evidence from assumptions, protects trader intent, and returns risk-aware Alpha Cards.",
+              system_prompt: getGhostveilSystemPrompt(),
+              model_name: swarmsModel,
+              temperature: 0.2,
+              max_tokens: 3000,
+              max_loops: 1,
+            },
+            task,
+          },
+    ),
   });
 
   const payloadText = await response.text();
@@ -523,6 +580,7 @@ async function runSwarmsReview({ query, pair, notes, publicMode, premiumMode, lo
   return {
     enabled: true,
     status: parsed ? "ok" : "raw",
+    mode: useSwarm ? "swarm" : "agent",
     model: swarmsModel,
     parsed,
     rawText: text,

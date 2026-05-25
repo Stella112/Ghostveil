@@ -98,11 +98,13 @@ $env:SWARMS_MODEL="gpt-4o-mini"
 npm start
 ```
 
-When the key is present, choose `Swarms API agent` in the Review Engine dropdown. The backend will call:
+When the key is present, choose `Swarms API agent` in the Review Engine dropdown. By default the backend runs GhostVeil through a multi-agent Swarms completion:
 
 ```text
-POST https://api.swarms.world/v1/agent/completions
+POST https://api.swarms.world/v1/swarm/completions
 ```
+
+Set `SWARMS_MODE=agent` only if you want the older single-agent fallback.
 
 The API key stays on the server. It is never sent to the browser.
 
@@ -110,9 +112,10 @@ The API key stays on the server. It is never sent to the browser.
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `SWARMS_API_KEY` | Yes for Swarms review | Runs GhostVeil through Swarms Agent Completions |
+| `SWARMS_API_KEY` | Yes for Swarms review | Runs GhostVeil through Swarms multi-agent completions |
 | `SWARMS_MODEL` | No | Defaults to `gpt-4o-mini` |
 | `SWARMS_BASE_URL` | No | Defaults to `https://api.swarms.world` |
+| `SWARMS_MODE` | No | Defaults to `swarm`; set `agent` for fallback |
 | `PORT` | No | Defaults to `4173` |
 
 DexScreener search does not require an API key.
