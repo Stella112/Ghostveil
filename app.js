@@ -11,13 +11,14 @@ const state = {
   paymentStatus: "unpaid",
   premiumQuote: null,
   paymentSignature: "",
+  paymentMessage: "",
 };
 
 const PREMIUM_FEE_USD = 0.1;
 const GHOSTBACK_RATE = 0.4;
 const SOLANA_RPC_URL = "https://api.mainnet-beta.solana.com";
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
-const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvoterCVicNWJvYsBpH4TtwTVNDC4eibZUU";
+const ASSOCIATED_TOKEN_PROGRAM_ID = "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL";
 
 const $ = (selector) => document.querySelector(selector);
 
@@ -226,6 +227,10 @@ function renderPaymentPanel(message = "") {
       : state.paymentStatus === "pending"
         ? "Awaiting wallet approval"
         : "Not paid";
+  const panelMessage =
+    message ||
+    state.paymentMessage ||
+    "Connect a Solana wallet, then approve a real $SWARMS transfer equivalent to $0.10.";
   $("#paymentPanel").innerHTML = `
     <div class="quality-row"><span>Wallet</span><strong>${escapeHtml(walletLabel)}</strong></div>
     <div class="quality-row"><span>Premium fee</span><strong>${money(PREMIUM_FEE_USD)} in $SWARMS</strong></div>
@@ -234,14 +239,23 @@ function renderPaymentPanel(message = "") {
     <div class="quality-row"><span>GhostBack</span><strong>${money(PREMIUM_FEE_USD * GHOSTBACK_RATE)}</strong></div>
     <div class="quality-row"><span>Status</span><strong>${escapeHtml(status)}</strong></div>
     ${state.paymentSignature ? `<div class="quality-row"><span>Signature</span><strong>${escapeHtml(shortAddress(state.paymentSignature))}</strong></div>` : ""}
-    <p>${escapeHtml(message || "Connect a Solana wallet, then approve a real $SWARMS transfer equivalent to $0.10.")}</p>
+    <p>${escapeHtml(panelMessage)}</p>
   `;
 }
 
 function renderPremiumButtons() {
-  const label = state.premiumUnlocked ? "Premium Ready" : "Pay $0.10 Premium";
+  const pending = state.paymentStatus === "pending";
+  const label = state.premiumUnlocked ? "Premium Ready" : pending ? "Awaiting Wallet" : "Pay $0.10 Premium";
   $("#unlockPremium").textContent = label;
-  $("#sideUnlockPremium").textContent = state.premiumUnlocked ? "Premium Ready" : "Connect Wallet + Pay $0.10";
+  $("#sideUnlockPremium").textContent = state.premiumUnlocked
+    ? "Premium Ready"
+    : pending
+      ? "Awaiting Wallet Approval"
+      : state.wallet.connected
+      ? "Pay $0.10 in $SWARMS"
+      : "Connect Wallet + Pay $0.10";
+  $("#unlockPremium").disabled = pending;
+  $("#sideUnlockPremium").disabled = pending;
   $("#premiumMode").checked = state.premiumUnlocked;
   renderPaymentPanel();
 }
@@ -490,6 +504,18 @@ async function sendSwarmsPayment(quote) {
     associatedProgram,
   );
 
+  const amount = BigInt(quote.rawAmount);
+  const fromAccount = await connection.getAccountInfo(fromAta);
+  if (!fromAccount) {
+    throw new Error("This wallet does not have a $SWARMS token account yet. Add $SWARMS to this wallet, then try again.");
+  }
+
+  const balance = await connection.getTokenAccountBalance(fromAta);
+  const available = BigInt(balance.value.amount || "0");
+  if (available < amount) {
+    throw new Error(`Not enough $SWARMS. Need ${tokenAmount(quote.tokenAmount)} $SWARMS plus a small SOL network fee.`);
+  }
+
   const toAccount = await connection.getAccountInfo(toAta);
   const transaction = new web3.Transaction();
   if (!toAccount) {
@@ -504,12 +530,11 @@ async function sendSwarmsPayment(quote) {
           { pubkey: web3.SystemProgram.programId, isSigner: false, isWritable: false },
           { pubkey: tokenProgram, isSigner: false, isWritable: false },
         ],
-        data: Buffer.alloc(0),
+        data: new Uint8Array(0),
       }),
     );
   }
 
-  const amount = BigInt(quote.rawAmount);
   const data = new Uint8Array(9);
   data[0] = 3;
   new DataView(data.buffer).setBigUint64(1, amount, true);
@@ -526,19 +551,35 @@ async function sendSwarmsPayment(quote) {
   );
 
   transaction.feePayer = owner;
-  const { blockhash } = await connection.getLatestBlockhash("confirmed");
-  transaction.recentBlockhash = blockhash;
+  const latestBlockhash = await connection.getLatestBlockhash("confirmed");
+  transaction.recentBlockhash = latestBlockhash.blockhash;
 
   let signature;
   if (provider.signAndSendTransaction) {
     const result = await provider.signAndSendTransaction(transaction);
-    signature = result.signature;
+    signature = result.signature || result;
   } else {
+    if (!provider.signTransaction) throw new Error("Connected wallet does not support transaction signing.");
     const signed = await provider.signTransaction(transaction);
     signature = await connection.sendRawTransaction(signed.serialize());
   }
-  await connection.confirmTransaction(signature, "confirmed");
+  await connection.confirmTransaction(
+    {
+      signature,
+      blockhash: latestBlockhash.blockhash,
+      lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
+    },
+    "confirmed",
+  );
   return signature;
+}
+
+function paymentErrorMessage(error) {
+  const message = error?.message || "Unknown wallet error";
+  if (error?.code === 4001 || /reject|cancel/i.test(message)) {
+    return "Payment was cancelled in the wallet.";
+  }
+  return message;
 }
 
 async function unlockPremium() {
@@ -547,26 +588,30 @@ async function unlockPremium() {
     if (!state.wallet.connected) return;
   }
   state.paymentStatus = "pending";
+  state.paymentMessage = "Fetching live $SWARMS quote for $0.10...";
   renderPremiumButtons();
-  renderPaymentPanel("Fetching live $SWARMS quote for $0.10...");
+  renderPaymentPanel(state.paymentMessage);
   $("#deskStatus").textContent = "Payment pending";
   try {
     const quote = await fetchPremiumQuote();
-    renderPaymentPanel(`Approve ${tokenAmount(quote.tokenAmount)} $SWARMS to ${shortAddress(quote.treasuryWallet)}.`);
+    state.paymentMessage = `Approve ${tokenAmount(quote.tokenAmount)} $SWARMS to ${shortAddress(quote.treasuryWallet)}.`;
+    renderPaymentPanel(state.paymentMessage);
     const signature = await sendSwarmsPayment(quote);
     state.paymentSignature = signature;
     state.paymentStatus = "paid";
+    state.paymentMessage = "Premium Pro unlocked after confirmed $SWARMS transfer.";
     state.premiumUnlocked = true;
     $("#premiumMode").checked = true;
     renderPremiumButtons();
     renderGhostBack(state.latestCard?.ghostBack || premiumGhostBack());
-    renderPaymentPanel("Premium Pro unlocked after confirmed $SWARMS transfer.");
+    renderPaymentPanel(state.paymentMessage);
     $("#deskStatus").textContent = "Premium unlocked";
   } catch (error) {
     state.paymentStatus = "unpaid";
+    state.paymentMessage = `Payment failed: ${paymentErrorMessage(error)}`;
     state.premiumUnlocked = false;
     renderPremiumButtons();
-    renderPaymentPanel(`Payment failed or cancelled: ${error.message}`);
+    renderPaymentPanel(state.paymentMessage);
     $("#deskStatus").textContent = "Payment failed";
   }
 }

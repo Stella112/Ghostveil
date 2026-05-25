@@ -6,97 +6,77 @@ Find early Solana alpha before it gets crowded.
 
 ## Short Description
 
-GhostVeil is a Solana signal verification swarm that connects market context, user-provided evidence, multi-agent review, and privacy-safe Alpha Cards for traders who want early intelligence without hype.
+Privacy-first Solana alpha verification swarm. GhostVeil scans token, mint, pair, and X-post inputs, fetches live market context, runs a multi-agent judge panel, protects trader intent, and outputs verified Alpha Cards with evidence, route, ratings, risk, and premium unlocks.
 
 ## Full Description
 
-GhostVeil Oracle Swarm helps traders and researchers inspect early Solana market signals without drowning in noise or acting on hype.
+GhostVeil Oracle Swarm is a privacy-first alpha verification swarm for Solana traders and researchers who want early market intelligence without joining a pump room.
 
-The working app can fetch Solana market context through a DexScreener connector, accept user-provided wallet, liquidity, narrative, social, and counter-signal notes, then generate a structured GhostVeil Alpha Card. If live market context is unavailable, GhostVeil clearly labels the output as framework-based analysis of provided evidence.
+Most DD agents are reactive: you paste a token and they summarize it. GhostVeil acts like a signal desk. A user can enter a token, mint, pair URL, or X post, and GhostVeil pulls live Solana market context, decodes social timing when possible, derives the evidence desk, judges the signal through a multi-agent swarm, protects private intent, and returns a polished GhostVeil Alpha Card.
 
-GhostVeil does not tell users what to buy. It does not promise profit. It behaves like a serious market intelligence desk: separate observed evidence from assumptions, identify risks, protect private trader intent, and reject weak or overcrowded signals.
+It operates through four core engines:
 
-GhostVeil operates through four core engines:
+1. **VeilSense Engine**  
+   Scans live Solana market context and user inputs for early, non-obvious signals across liquidity, volume, fresh launches, unusual activity, narrative shifts, X/social timing, counter-signals, and crowding risk.
 
-1. VeilSense Engine
-   Reviews Solana market context and user evidence for possible early signals across liquidity, volume, launches, wallet notes, narrative shifts, social momentum, unusual activity, counter-signals, and crowding risk.
+2. **Alpha Tribunal**  
+   Multi-agent judge panel that debates every signal using bull case, bear case, timing, liquidity quality, rug/MEV risk, hype quality, crowding risk, and invalidation conditions. Weak or noisy signals are rejected.
 
-2. Alpha Tribunal
-   Stress-tests each signal through bull case, bear case, timing, liquidity quality, risk level, crowding, rug risk, MEV exposure, and invalidation conditions. Weak, overhyped, or unsafe signals are rejected.
+3. **VeilGuard Privacy Layer**  
+   Protects trader intent by design. Public Alpha Cards are sanitized so wallet intent, private strategy, sizing, and sensitive execution notes are not exposed.
 
-3. VeilGuard Privacy Layer
-   Separates public output from private trader intent. Public Alpha Cards can include the thesis, scores, risk notes, and evidence summary, but they do not reveal private sizing, strategy notes, sensitive wallet intent, or user-specific execution logic.
+4. **GhostProof Layer**  
+   Turns surviving signals into professional GhostVeil Alpha Cards with Stealth Score, Conviction Score, Risk Score, GhostProof Score, Alpha Rating, Source Rating, signal route, X-post timing, evidence trail, Tribunal review, GhostTrade Risk Preview, invalidation points, next steps, and shareable X/Discord summary.
 
-4. GhostProof Layer
-   Turns verified signals into Alpha Cards with scores, evidence trail, Tribunal review, VeilGuard privacy check, GhostTrade Risk Preview, invalidation point, next steps, final verdict, and a shareable X/Discord summary.
+## Simple User Flow
 
-## Alpha Card Fields
-
-- Signal Name
-- Market/Narrative
-- Current Stage
-- Stealth Score
-- Conviction Score
-- Risk Score
-- GhostProof Score
-- Why It Matters Now
-- Evidence Trail
-- Alpha Tribunal Review
-- VeilGuard Privacy Check
-- GhostTrade Risk Preview
-- Invalidation Point
-- Suggested Next Steps
-- Final Verdict
-- Shareable X/Discord Summary
-
-## Working App Features
-
-- Solana market context search through DexScreener
-- Provided-data mode when live context is unavailable
-- Manual evidence fields for wallet, liquidity, narrative, social, and counter-signals
-- Private notes protected by VeilGuard
-- Exportable Alpha Card JSON
-- Public-safe share summary
-- Local watchlist history
-- Premium Pro mode with GhostBack reward economics
-
-## GhostBack Rewards
-
-GhostBack is a usage-based reward pool funded by Premium Signal revenue.
-
-Every time a user pays for a Premium Pro Alpha Card, 40% of that Premium Signal fee goes into the GhostBack Reward Pool. The pool rewards Signal Scouts, Alpha Validators, Card Distributors, and Power Users who improve signal quality and distribution.
-
-GhostBack is funded by actual Premium Signal usage, not token trading fees.
+1. Enter a token, mint, pair URL, or X post.
+2. GhostVeil fetches market context and derives evidence.
+3. VeilSense scans.
+4. Alpha Tribunal judges.
+5. VeilGuard sanitizes.
+6. GhostProof delivers the verified Alpha Card.
+7. User can unlock Premium Pro by paying the $SWARMS equivalent of $0.10.
 
 ## Monetization and Access
 
 - Free tier: basic scans and public-safe Alpha Cards
-- Premium Pro Signals: $1 per high-value Alpha Card
-- Payments: x402 support, settlement in USDC or $SWARMS
+- Premium Pro Signals: $0.10 per premium Alpha Card
+- Payment: $SWARMS equivalent of $0.10 to the GhostVeil treasury wallet
+- Treasury wallet: `4ogwVdsKTyCKB9mowj5QyehhCpiQE5FsijG8gcL5haYE`
+- GhostBack Rewards: 40% of Premium Signal revenue goes into the contributor pool
 - Frenzy Mode: enabled for creator revenue share on every use
-- GhostBack: 40% of Premium Signal revenue goes to contributors
+
+GhostBack rewards Signal Scouts, Alpha Validators, Card Distributors, and Power Users. It is funded by actual Premium Signal usage, not token trading fees.
+
+GhostVeil creates a clean loop: better verified signals -> more Premium usage -> larger GhostBack pool -> stronger contributors -> better signals.
+
+## Working App Features
+
+- Live DexScreener Solana market context
+- AI Evidence Desk filled by GhostVeil, not manual user labor
+- Optional manual evidence only for advanced users
+- Swarms multi-agent completion flow
+- Solana wallet connect through Phantom-compatible providers
+- Real SPL-token payment transaction for $SWARMS premium unlocks
+- Quote endpoint for `$0.10` worth of `$SWARMS`
+- Alpha Rating and Source Rating
+- Signal route and X-post timestamp decoding
+- Exportable Alpha Card JSON
+- Privacy-safe share summary
+- Local watchlist history
 
 ## Suggested Metadata
 
 - Name: GhostVeil Oracle Swarm
 - Tagline: Find early Solana alpha before it gets crowded.
 - Category: Finance / DeFi / Research / Tools
-- Product type: Agent
-- Pricing: Free tier plus $1 Premium Pro via x402
+- Product type: Multi-agent app
+- Pricing: Free tier plus $0.10 Premium Pro in $SWARMS
 - Frenzy Mode: Enabled
 - Ticker idea: GVEIL
-- Tags: solana, defi, alpha, swarms, x402, frenzy, market-analysis, risk-scoring, privacy
+- Tags: solana, defi, alpha, swarms, x402, frenzy, market-analysis, risk-scoring, privacy, spl-token
 
-## Use Cases
+## Differentiation
 
-1. Early Solana Signal Verification
-   Enter a token, mint address, pair URL, or market note and generate a structured Alpha Card.
-
-2. Crypto Research Noise Filtering
-   Convert market context and trader notes into a clear Approved, Watchlist, Rejected, High Risk, or Premium Signal Candidate verdict.
-
-3. Privacy-Safe Alpha Publishing
-   Create public summaries without exposing private wallet intent, trade size assumptions, or strategy notes.
-
-4. Premium Research Workflow
-   Produce deeper paid cards with GhostTrade Risk Preview, private brief notes, alert logic, and contributor reward tracking.
+VCB-style agents are reactive boardrooms. GhostVeil is a privacy-first signal verification layer: it pulls market context, derives evidence, debates the signal, hides private intent, and outputs a compact Alpha Card built for action and sharing.
