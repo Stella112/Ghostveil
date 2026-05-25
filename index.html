@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>GhostVeil Oracle Swarm</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <nav class="topbar" aria-label="GhostVeil navigation">
+        <div class="brand">
+          <div class="brand-mark" aria-hidden="true">
+            <span></span><span></span><span></span><span></span>
+          </div>
+          <div>
+            <p class="eyebrow">GhostVeil</p>
+            <h1>Solana signal verification desk</h1>
+          </div>
+        </div>
+        <div class="top-actions">
+          <span id="healthStatus">Checking data connector</span>
+          <button id="exportCard" disabled>Export Card</button>
+        </div>
+      </nav>
+
+      <section class="layout">
+        <aside class="left-rail" aria-label="Signal scan form">
+          <form id="scanForm" class="panel form-panel">
+            <div class="section-heading">
+              <p class="eyebrow">New Scan</p>
+              <h2>Verify a Solana signal</h2>
+            </div>
+
+            <label>
+              Token, mint, pair URL, or market note
+              <input id="queryInput" name="query" autocomplete="off" placeholder="Example: BONK, JUP, a mint address, or a DexScreener URL" />
+            </label>
+
+            <div class="button-row">
+              <button type="button" id="searchMarket">Fetch Market Context</button>
+              <button type="submit" class="primary">Generate Alpha Card</button>
+            </div>
+
+            <div id="searchResults" class="search-results" aria-live="polite"></div>
+
+            <div class="mode-grid">
+              <label>
+                Review Engine
+                <select id="reviewEngine">
+                  <option value="local" selected>Local GhostVeil rules</option>
+                  <option value="swarms">Swarms API agent</option>
+                </select>
+              </label>
+              <label>
+                Source Mode
+                <select id="sourceMode">
+                  <option value="live" selected>Live context + my notes</option>
+                  <option value="provided">My provided data only</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="mode-grid">
+              <label>
+                Card Mode
+                <select id="cardMode">
+                  <option value="public" selected>Public-safe card</option>
+                  <option value="private">Private research brief</option>
+                </select>
+              </label>
+            </div>
+
+            <label>
+              Wallet evidence
+              <textarea id="walletNotes" rows="3" placeholder="Wallet clusters, smart-wallet entries, whale movement, or leave blank."></textarea>
+            </label>
+
+            <label>
+              Liquidity evidence
+              <textarea id="liquidityNotes" rows="3" placeholder="Liquidity changes, pool depth, volume quality, slippage concerns."></textarea>
+            </label>
+
+            <label>
+              Narrative notes
+              <textarea id="narrativeNotes" rows="3" placeholder="Sector, launch context, market theme, or narrative shift."></textarea>
+            </label>
+
+            <label>
+              Social momentum notes
+              <textarea id="socialNotes" rows="3" placeholder="Attention source, social quality, influencer risk, Discord or X momentum."></textarea>
+            </label>
+
+            <label>
+              Counter-signals
+              <textarea id="counterNotes" rows="3" placeholder="Sell pressure, crowding, holder concentration, paid hype, rug or MEV concern."></textarea>
+            </label>
+
+            <label>
+              Private notes protected by VeilGuard
+              <textarea id="privateNotes" rows="3" placeholder="Sizing assumptions, private watchlist logic, or strategy notes. Hidden from public cards."></textarea>
+            </label>
+
+            <label class="checkline">
+              <input id="premiumMode" type="checkbox" />
+              Include Premium Pro and GhostBack economics
+            </label>
+          </form>
+        </aside>
+
+        <section class="main-panel" aria-label="GhostVeil Alpha Card workspace">
+          <div class="command-strip">
+            <div>
+              <p class="eyebrow">Core Principle</p>
+              <strong>Find early Solana alpha before it gets crowded.</strong>
+            </div>
+            <div class="pipeline" aria-label="GhostVeil engines">
+              <span>VeilSense</span>
+              <span>Alpha Tribunal</span>
+              <span>VeilGuard</span>
+              <span>GhostProof</span>
+            </div>
+          </div>
+
+          <article id="emptyState" class="empty-state">
+            <p class="eyebrow">Ready</p>
+            <h2>Enter a Solana asset or paste your own evidence.</h2>
+            <p>
+              GhostVeil will fetch market context when available, separate observed evidence from assumptions,
+              stress-test the signal, and return a structured Alpha Card.
+            </p>
+          </article>
+
+          <article id="alphaCard" class="alpha-card hidden" aria-label="GhostVeil Alpha Card">
+            <header class="card-header">
+              <div>
+                <p class="eyebrow">GhostVeil Alpha Card</p>
+                <h2 id="signalName"></h2>
+                <p id="marketNarrative"></p>
+              </div>
+              <div class="verdict-box">
+                <span id="finalVerdict"></span>
+                <small id="currentStage"></small>
+              </div>
+            </header>
+
+            <div class="score-grid">
+              <div class="score">
+                <span id="stealthScore">0</span>
+                <p>Stealth</p>
+                <i id="stealthBar"></i>
+              </div>
+              <div class="score">
+                <span id="convictionScore">0</span>
+                <p>Conviction</p>
+                <i id="convictionBar"></i>
+              </div>
+              <div class="score risk">
+                <span id="riskScore">0</span>
+                <p>Risk</p>
+                <i id="riskBar"></i>
+              </div>
+              <div class="score">
+                <span id="ghostProofScore">0</span>
+                <p>GhostProof</p>
+                <i id="ghostProofBar"></i>
+              </div>
+            </div>
+
+            <section class="card-section">
+              <p class="eyebrow">Why It Matters Now</p>
+              <p id="whyItMatters"></p>
+            </section>
+
+            <section class="card-section">
+              <p class="eyebrow">Evidence Trail</p>
+              <div id="evidenceTrail" class="evidence-grid"></div>
+            </section>
+
+            <section class="card-section">
+              <p class="eyebrow">Alpha Tribunal Review</p>
+              <div id="tribunalReview" class="review-grid"></div>
+            </section>
+
+            <section class="card-section two-col">
+              <div>
+                <p class="eyebrow">VeilGuard Privacy Check</p>
+                <div id="privacyCheck" class="stack-list"></div>
+              </div>
+              <div>
+                <p class="eyebrow">GhostTrade Risk Preview</p>
+                <div id="riskPreview" class="stack-list"></div>
+              </div>
+            </section>
+
+            <section class="card-section">
+              <p class="eyebrow">Suggested Next Steps</p>
+              <p id="nextSteps"></p>
+            </section>
+
+            <section class="share-card">
+              <p id="shareSummary"></p>
+              <button id="copyShare" type="button">Copy Share Summary</button>
+            </section>
+
+            <p class="disclaimer" id="disclaimer"></p>
+          </article>
+        </section>
+
+        <aside class="right-rail" aria-label="Source quality and history">
+          <article class="panel">
+            <p class="eyebrow">Source Quality</p>
+            <div id="sourceQuality" class="source-box">
+              <p>No scan has run yet.</p>
+            </div>
+          </article>
+
+          <article class="panel">
+            <p class="eyebrow">GhostBack</p>
+            <div id="ghostBackBox" class="source-box">
+              <p>Enable Premium Pro to show reward economics.</p>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-title-row">
+              <p class="eyebrow">Watchlist History</p>
+              <button id="clearHistory" type="button">Clear</button>
+            </div>
+            <div id="historyList" class="history-list"></div>
+          </article>
+        </aside>
+      </section>
+    </main>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -1,0 +1,332 @@
+const state = {
+  selectedPair: null,
+  latestCard: null,
+  history: JSON.parse(localStorage.getItem("ghostveil-history") || "[]"),
+};
+
+const $ = (selector) => document.querySelector(selector);
+
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
+}
+
+function money(value) {
+  const amount = Number(value || 0);
+  if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(2)}M`;
+  if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1)}K`;
+  return `$${amount.toFixed(2)}`;
+}
+
+function setLoading(isLoading) {
+  $("#searchMarket").disabled = isLoading;
+  $("#scanForm .primary").disabled = isLoading;
+  $("#scanForm .primary").textContent = isLoading ? "Running Review" : "Generate Alpha Card";
+}
+
+async function api(path, options = {}) {
+  const response = await fetch(path, {
+    headers: { "content-type": "application/json" },
+    ...options,
+  });
+  const payload = await response.json();
+  if (!response.ok && response.status !== 206) {
+    throw new Error(payload.error || `Request failed with ${response.status}`);
+  }
+  return payload;
+}
+
+function pairLabel(pair) {
+  const base = pair?.baseToken?.symbol || pair?.baseToken?.name || "Unknown";
+  const quote = pair?.quoteToken?.symbol || "";
+  return quote ? `${base}/${quote}` : base;
+}
+
+function renderSearchResults(payload) {
+  const box = $("#searchResults");
+  if (payload.warning && !payload.pairs.length) {
+    box.innerHTML = `<div class="notice">Live connector unavailable: ${escapeHtml(payload.warning)}. You can still analyze provided data.</div>`;
+    return;
+  }
+
+  if (!payload.pairs.length) {
+    box.innerHTML = `<div class="notice">No Solana market pairs found. Add evidence manually or try a mint address.</div>`;
+    return;
+  }
+
+  box.innerHTML = payload.pairs
+    .map((pair, index) => {
+      const selected = state.selectedPair?.pairAddress === pair.pairAddress ? " selected" : "";
+      return `
+        <button class="pair-result${selected}" type="button" data-index="${index}">
+          <strong>${escapeHtml(pairLabel(pair))}</strong>
+          <span>${escapeHtml((pair.dexId || "DEX").toUpperCase())} ${money(pair.liquidity?.usd)} liq ${money(pair.volume?.h24)} 24h vol</span>
+        </button>
+      `;
+    })
+    .join("");
+
+  box.querySelectorAll(".pair-result").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.selectedPair = payload.pairs[Number(button.dataset.index)];
+      renderSearchResults(payload);
+    });
+  });
+
+  if (!state.selectedPair) {
+    state.selectedPair = payload.pairs[0];
+    renderSearchResults(payload);
+  }
+}
+
+function notesPayload() {
+  return {
+    wallet: $("#walletNotes").value,
+    liquidity: $("#liquidityNotes").value,
+    narrative: $("#narrativeNotes").value,
+    social: $("#socialNotes").value,
+    counter: $("#counterNotes").value,
+    private: $("#privateNotes").value,
+  };
+}
+
+function setScore(name, value) {
+  $(`#${name}Score`).textContent = value;
+  $(`#${name}Bar`).style.width = `${value}%`;
+}
+
+function renderKeyValue(container, entries) {
+  container.innerHTML = entries
+    .map(
+      ([label, value]) => `
+        <div>
+          <strong>${escapeHtml(label)}</strong>
+          <p>${Array.isArray(value) ? value.map(escapeHtml).join("<br>") : escapeHtml(value)}</p>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+function renderAlphaCard(result) {
+  const card = result.alphaCard;
+  state.latestCard = result;
+
+  $("#emptyState").classList.add("hidden");
+  $("#alphaCard").classList.remove("hidden");
+  $("#exportCard").disabled = false;
+
+  $("#signalName").textContent = card.signalName;
+  $("#marketNarrative").textContent = card.marketNarrative;
+  $("#finalVerdict").textContent = card.finalVerdict;
+  $("#currentStage").textContent = card.currentStage;
+  $("#whyItMatters").textContent = card.whyItMattersNow;
+  $("#nextSteps").textContent = card.suggestedNextSteps;
+  $("#shareSummary").textContent = card.shareableSummary;
+  $("#disclaimer").textContent = card.disclaimer;
+
+  setScore("stealth", card.scores.stealth);
+  setScore("conviction", card.scores.conviction);
+  setScore("risk", card.scores.risk);
+  setScore("ghostProof", card.scores.ghostProof);
+
+  renderKeyValue($("#evidenceTrail"), [
+    ["Wallet Evidence", card.evidenceTrail.wallet],
+    ["Liquidity Evidence", card.evidenceTrail.liquidity],
+    ["Narrative Evidence", card.evidenceTrail.narrative],
+    ["Social Momentum", card.evidenceTrail.socialMomentum],
+    ["Counter-Signals", card.evidenceTrail.counterSignals],
+  ]);
+
+  renderKeyValue($("#tribunalReview"), [
+    ["Bull Case", card.alphaTribunal.bullCase],
+    ["Bear Case", card.alphaTribunal.bearCase],
+    ["Timing Check", card.alphaTribunal.timingCheck],
+    ["Rug / MEV / Liquidity Risks", card.alphaTribunal.riskReview],
+    ["Crowding Risk", card.alphaTribunal.crowdingRisk],
+    ["Final Judgment", card.alphaTribunal.finalJudgment],
+  ]);
+
+  renderKeyValue($("#privacyCheck"), [
+    ["Public-safe summary", card.veilGuardPrivacyCheck.publicSafeSummary],
+    ["Sensitive details removed", card.veilGuardPrivacyCheck.sensitiveDetailsRemoved],
+    ["Privacy risk level", card.veilGuardPrivacyCheck.privacyRiskLevel],
+  ]);
+
+  renderKeyValue($("#riskPreview"), [
+    ["Best-case path", card.ghostTradeRiskPreview.bestCasePath],
+    ["Base-case path", card.ghostTradeRiskPreview.baseCasePath],
+    ["Worst-case path", card.ghostTradeRiskPreview.worstCasePath],
+    ["Key risk trigger", card.ghostTradeRiskPreview.keyRiskTrigger],
+    ["Invalidation point", card.ghostTradeRiskPreview.invalidationPoint],
+  ]);
+
+  renderSourceQuality(result);
+  renderGhostBack(result.ghostBack);
+  addHistory(result);
+}
+
+function renderSourceQuality(result) {
+  const quality = result.sourceQuality;
+  $("#sourceQuality").innerHTML = `
+    <div class="quality-row"><span>Data status</span><strong>${escapeHtml(result.dataStatus)}</strong></div>
+    <div class="quality-row"><span>Review engine</span><strong>${escapeHtml(result.reviewEngine || "local")}</strong></div>
+    <div class="quality-row"><span>Live pair</span><strong>${quality.livePairConnected ? "Connected" : "Not connected"}</strong></div>
+    <div class="quality-row"><span>User evidence</span><strong>${quality.userEvidenceProvided ? "Provided" : "Not provided"}</strong></div>
+    <div class="quality-row"><span>Swarms API</span><strong>${escapeHtml(result.swarmsReview?.status || "not used")}</strong></div>
+    <div class="mini-list">
+      <strong>Observed evidence</strong>
+      ${quality.directEvidence.map((item) => `<p>${escapeHtml(item)}</p>`).join("")}
+    </div>
+    <div class="mini-list">
+      <strong>Assumptions</strong>
+      ${(quality.assumptions.length ? quality.assumptions : ["No major assumptions recorded."])
+        .map((item) => `<p>${escapeHtml(item)}</p>`)
+        .join("")}
+    </div>
+  `;
+}
+
+function renderGhostBack(ghostBack) {
+  if (!ghostBack) {
+    $("#ghostBackBox").innerHTML = "<p>Enable Premium Pro to show reward economics.</p>";
+    return;
+  }
+
+  $("#ghostBackBox").innerHTML = `
+    <div class="quality-row"><span>Premium fee</span><strong>${money(ghostBack.premiumFeeUsd)}</strong></div>
+    <div class="quality-row"><span>Reward pool</span><strong>${money(ghostBack.rewardPoolUsd)}</strong></div>
+    <p>${escapeHtml(ghostBack.fundedBy)}.</p>
+    <div class="split-list">
+      <div><span>Signal Scouts</span><b>${money(ghostBack.splits.signalScouts)}</b></div>
+      <div><span>Alpha Validators</span><b>${money(ghostBack.splits.alphaValidators)}</b></div>
+      <div><span>Card Distributors</span><b>${money(ghostBack.splits.cardDistributors)}</b></div>
+    </div>
+  `;
+}
+
+function addHistory(result) {
+  const entry = {
+    at: result.generatedAt,
+    signalName: result.alphaCard.signalName,
+    verdict: result.alphaCard.finalVerdict,
+    stage: result.alphaCard.currentStage,
+    scores: result.alphaCard.scores,
+  };
+  state.history = [entry, ...state.history.filter((item) => item.signalName !== entry.signalName)].slice(0, 8);
+  localStorage.setItem("ghostveil-history", JSON.stringify(state.history));
+  renderHistory();
+}
+
+function renderHistory() {
+  if (!state.history.length) {
+    $("#historyList").innerHTML = "<p>No cards yet.</p>";
+    return;
+  }
+
+  $("#historyList").innerHTML = state.history
+    .map(
+      (item) => `
+        <div class="history-item">
+          <strong>${escapeHtml(item.signalName)}</strong>
+          <span>${escapeHtml(item.verdict)} / ${escapeHtml(item.stage)}</span>
+          <small>GP ${item.scores.ghostProof} Risk ${item.scores.risk}</small>
+        </div>
+      `,
+    )
+    .join("");
+}
+
+async function runSearch() {
+  const query = $("#queryInput").value.trim();
+  if (!query) {
+    $("#searchResults").innerHTML = `<div class="notice">Enter a token, mint, or pair URL first.</div>`;
+    return;
+  }
+  $("#searchResults").innerHTML = `<div class="notice">Fetching Solana market context...</div>`;
+  state.selectedPair = null;
+  const payload = await api(`/api/search?q=${encodeURIComponent(query)}`);
+  renderSearchResults(payload);
+}
+
+async function runAnalysis(event) {
+  event?.preventDefault();
+  setLoading(true);
+  try {
+    const payload = await api("/api/analyze", {
+      method: "POST",
+      body: JSON.stringify({
+        query: $("#queryInput").value.trim(),
+        selectedPair: state.selectedPair,
+        reviewEngine: $("#reviewEngine").value,
+        sourceMode: $("#sourceMode").value,
+        publicMode: $("#cardMode").value === "public",
+        premiumMode: $("#premiumMode").checked,
+        notes: notesPayload(),
+      }),
+    });
+    renderAlphaCard(payload);
+  } catch (error) {
+    $("#emptyState").classList.remove("hidden");
+    $("#emptyState").innerHTML = `
+      <p class="eyebrow">Scan Failed</p>
+      <h2>GhostVeil could not complete the review.</h2>
+      <p>${escapeHtml(error.message)}</p>
+    `;
+  } finally {
+    setLoading(false);
+  }
+}
+
+function exportLatestCard() {
+  if (!state.latestCard) return;
+  const blob = new Blob([JSON.stringify(state.latestCard, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${state.latestCard.alphaCard.signalName.replace(/[^a-z0-9]+/gi, "-").toLowerCase()}-ghostveil-card.json`;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function checkHealth() {
+  try {
+    const payload = await api("/api/health");
+    const swarmsText = payload.swarms?.configured ? "Swarms API connected" : "Swarms key needed";
+    $("#healthStatus").textContent = payload.ok ? `DexScreener ready / ${swarmsText}` : "Connector unavailable";
+    const swarmsOption = $("#reviewEngine").querySelector('option[value="swarms"]');
+    swarmsOption.textContent = payload.swarms?.configured ? "Swarms API agent" : "Swarms API agent (needs key)";
+  } catch {
+    $("#healthStatus").textContent = "Connector unavailable";
+  }
+}
+
+$("#searchMarket").addEventListener("click", () => {
+  runSearch().catch((error) => {
+    $("#searchResults").innerHTML = `<div class="notice">Live connector unavailable: ${escapeHtml(error.message)}. You can still analyze provided data.</div>`;
+  });
+});
+
+$("#scanForm").addEventListener("submit", runAnalysis);
+$("#copyShare").addEventListener("click", async () => {
+  await navigator.clipboard.writeText($("#shareSummary").textContent);
+  $("#copyShare").textContent = "Copied";
+  setTimeout(() => {
+    $("#copyShare").textContent = "Copy Share Summary";
+  }, 1100);
+});
+$("#exportCard").addEventListener("click", exportLatestCard);
+$("#clearHistory").addEventListener("click", () => {
+  state.history = [];
+  localStorage.removeItem("ghostveil-history");
+  renderHistory();
+});
+
+renderHistory();
+checkHealth();

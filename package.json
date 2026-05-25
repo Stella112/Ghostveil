@@ -1,0 +1,19 @@
+{
+  "name": "ghostveil-oracle-swarm",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Working Solana signal verification app and Swarms marketplace agent package.",
+  "scripts": {
+    "start": "node server.js",
+    "check": "node --check app.js && node --check server.js && node --check api/_ghostveil.js && node --check api/health.js && node --check api/search.js && node --check api/analyze.js"
+  },
+  "keywords": [
+    "swarms",
+    "agent",
+    "solana",
+    "alpha",
+    "marketplace",
+    "frenzy-mode"
+  ],
+  "license": "MIT"
+}
