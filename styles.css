@@ -134,7 +134,8 @@ h2 {
 .top-actions button,
 .button-row button,
 .share-card button,
-.panel-title-row button {
+.panel-title-row button,
+.quiet-button {
   background: rgba(255, 255, 255, 0.07);
   border: 1px solid rgba(255, 255, 255, 0.12);
   color: var(--text);
@@ -490,6 +491,10 @@ textarea:focus {
 .source-box {
   display: grid;
   gap: 11px;
+}
+
+.quiet-button {
+  width: max-content;
 }
 
 .quality-row,

@@ -28,6 +28,7 @@ GhostVeil does not execute trades, promise profit, or invent live data. If live 
 - Premium Pro mode with GhostBack reward economics
 - Exportable Alpha Card JSON
 - Swarms API agent review when `SWARMS_API_KEY` is configured
+- Client-side Solana wallet connect for marketplace/payment readiness
 
 ## Run Locally
 
@@ -149,6 +150,7 @@ GhostVeil is market intelligence software, not financial advice.
 - It separates observed evidence from assumptions.
 - It includes risks and invalidation conditions.
 - It protects private user intent from public Alpha Cards.
+- Connected wallet addresses stay client-side and are not sent into Swarms analysis prompts.
 
 ## Swarms References
 

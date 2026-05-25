@@ -2,6 +2,11 @@ const state = {
   selectedPair: null,
   latestCard: null,
   history: JSON.parse(localStorage.getItem("ghostveil-history") || "[]"),
+  wallet: {
+    connected: false,
+    address: "",
+    provider: "",
+  },
 };
 
 const $ = (selector) => document.querySelector(selector);
@@ -241,6 +246,63 @@ function renderHistory() {
     .join("");
 }
 
+function shortAddress(address) {
+  if (!address) return "";
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
+function renderWallet() {
+  const label = state.wallet.connected ? shortAddress(state.wallet.address) : "Not connected";
+  $("#connectWallet").textContent = state.wallet.connected ? label : "Connect Wallet";
+  $("#walletBox").innerHTML = state.wallet.connected
+    ? `
+      <div class="quality-row"><span>Status</span><strong>Connected</strong></div>
+      <div class="quality-row"><span>Provider</span><strong>${escapeHtml(state.wallet.provider)}</strong></div>
+      <div class="quality-row"><span>Address</span><strong>${escapeHtml(label)}</strong></div>
+      <p>Wallet is connected locally for marketplace/payment readiness. The full address is not sent to GhostVeil analysis or Swarms prompts.</p>
+      <button id="disconnectWallet" type="button" class="quiet-button">Disconnect</button>
+    `
+    : `
+      <div class="quality-row"><span>Status</span><strong>Not connected</strong></div>
+      <p>Connect Phantom or another Solana wallet for launch readiness. GhostVeil keeps the connected wallet client-side.</p>
+    `;
+
+  const disconnect = $("#disconnectWallet");
+  if (disconnect) {
+    disconnect.addEventListener("click", async () => {
+      try {
+        await window.solana?.disconnect?.();
+      } catch {}
+      state.wallet = { connected: false, address: "", provider: "" };
+      renderWallet();
+    });
+  }
+}
+
+async function connectWallet() {
+  const provider = window.solana;
+  if (!provider?.isPhantom && !provider?.connect) {
+    $("#walletBox").innerHTML = `
+      <div class="notice">No Solana wallet was detected. Install Phantom, reload the page, then connect.</div>
+      <p>Phantom: https://phantom.app</p>
+    `;
+    return;
+  }
+
+  try {
+    const response = await provider.connect();
+    const publicKey = response?.publicKey || provider.publicKey;
+    state.wallet = {
+      connected: Boolean(publicKey),
+      address: publicKey?.toString?.() || "",
+      provider: provider.isPhantom ? "Phantom" : "Solana Wallet",
+    };
+    renderWallet();
+  } catch (error) {
+    $("#walletBox").innerHTML = `<div class="notice">Wallet connection cancelled or failed: ${escapeHtml(error.message || "Unknown error")}</div>`;
+  }
+}
+
 async function runSearch() {
   const query = $("#queryInput").value.trim();
   if (!query) {
@@ -322,6 +384,7 @@ $("#copyShare").addEventListener("click", async () => {
   }, 1100);
 });
 $("#exportCard").addEventListener("click", exportLatestCard);
+$("#connectWallet").addEventListener("click", connectWallet);
 $("#clearHistory").addEventListener("click", () => {
   state.history = [];
   localStorage.removeItem("ghostveil-history");
@@ -329,4 +392,5 @@ $("#clearHistory").addEventListener("click", () => {
 });
 
 renderHistory();
+renderWallet();
 checkHealth();

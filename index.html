@@ -20,6 +20,7 @@
         </div>
         <div class="top-actions">
           <span id="healthStatus">Checking data connector</span>
+          <button id="connectWallet" type="button">Connect Wallet</button>
           <button id="exportCard" disabled>Export Card</button>
         </div>
       </nav>
@@ -208,6 +209,14 @@
         </section>
 
         <aside class="right-rail" aria-label="Source quality and history">
+          <article class="panel">
+            <p class="eyebrow">Wallet</p>
+            <div id="walletBox" class="source-box">
+              <div class="quality-row"><span>Status</span><strong>Not connected</strong></div>
+              <p>Connect a Solana wallet for marketplace/payment readiness. GhostVeil does not send your wallet address into signal analysis.</p>
+            </div>
+          </article>
+
           <article class="panel">
             <p class="eyebrow">Source Quality</p>
             <div id="sourceQuality" class="source-box">
