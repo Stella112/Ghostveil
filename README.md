@@ -18,6 +18,7 @@ GhostVeil does not execute trades, promise profit, or invent live data. If live 
 ## What the App Includes
 
 - DexScreener Solana market context connector
+- Solana RPC wallet intelligence for token-holder concentration and recent wallet counterparty heuristics
 - Provided-data mode when live data is unavailable
 - VeilSense scoring for stealth, conviction, and risk
 - Alpha Tribunal review with bull, bear, timing, risk, and crowding checks
@@ -81,6 +82,8 @@ SWARMS_API_KEY=your-real-key-here
 SWARMS_MODEL=gpt-4o-mini
 SWARMS_BASE_URL=https://api.swarms.world
 SWARMS_MODE=swarm
+HELIUS_API_KEY=
+SOLANA_RPC_URLS=
 PORT=4173
 ```
 
@@ -116,9 +119,11 @@ The API key stays on the server. It is never sent to the browser.
 | `SWARMS_MODEL` | No | Defaults to `gpt-4o-mini` |
 | `SWARMS_BASE_URL` | No | Defaults to `https://api.swarms.world` |
 | `SWARMS_MODE` | No | Defaults to `swarm`; set `agent` for fallback |
+| `HELIUS_API_KEY` | No | Recommended for reliable Solana wallet/holder cluster scans |
+| `SOLANA_RPC_URLS` | No | Optional comma-separated Solana RPC fallback endpoints |
 | `PORT` | No | Defaults to `4173` |
 
-DexScreener search does not require an API key.
+DexScreener search does not require an API key. Wallet intelligence can use public Solana RPC, but public endpoints may rate-limit holder-cluster calls. Add `HELIUS_API_KEY` or `SOLANA_RPC_URLS` for reliable production scans.
 
 ## Local Checks
 
@@ -154,6 +159,7 @@ GhostVeil is market intelligence software, not financial advice.
 - It includes risks and invalidation conditions.
 - It protects private user intent from public Alpha Cards.
 - It does not require wallet connection or payment in the current build.
+- Wallet cluster notes are public on-chain heuristics, not proof that wallets share ownership.
 
 ## Swarms References
 

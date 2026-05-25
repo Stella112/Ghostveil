@@ -31,7 +31,24 @@ const swarmsApiKey = process.env.SWARMS_API_KEY || "";
 const swarmsModel = process.env.SWARMS_MODEL || "gpt-4o-mini";
 const swarmsBaseUrl = process.env.SWARMS_BASE_URL || "https://api.swarms.world";
 const swarmsMode = process.env.SWARMS_MODE || "swarm";
+const solanaRpcEndpoints = (process.env.SOLANA_RPC_URLS || process.env.SOLANA_RPC_URL || "")
+  .split(",")
+  .map((item) => item.trim())
+  .filter(Boolean);
+if (process.env.HELIUS_API_KEY) {
+  solanaRpcEndpoints.unshift(`https://mainnet.helius-rpc.com/?api-key=${process.env.HELIUS_API_KEY}`);
+}
+if (!solanaRpcEndpoints.length) {
+  solanaRpcEndpoints.push("https://api.mainnet-beta.solana.com", "https://solana-rpc.publicnode.com", "https://rpc.ankr.com/solana");
+}
 const ghostveilPromptPath = path.join(root, "agent", "system_prompt.md");
+const tokenProgramId = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+const knownSolanaPrograms = new Set([
+  "11111111111111111111111111111111",
+  "ComputeBudget111111111111111111111111111111",
+  "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL",
+  tokenProgramId,
+]);
 
 const types = {
   ".html": "text/html; charset=utf-8",
@@ -65,6 +82,20 @@ function money(value) {
   if (amount >= 1_000_000) return `$${(amount / 1_000_000).toFixed(2)}M`;
   if (amount >= 1_000) return `$${(amount / 1_000).toFixed(1)}K`;
   return `$${amount.toFixed(2)}`;
+}
+
+function shortAddress(address) {
+  if (!address) return "";
+  return `${address.slice(0, 4)}...${address.slice(-4)}`;
+}
+
+function extractSolanaAddresses(...values) {
+  const found = new Set();
+  for (const value of values.filter(Boolean)) {
+    const matches = String(value).match(/[1-9A-HJ-NP-Za-km-z]{32,44}/g) || [];
+    for (const match of matches) found.add(match);
+  }
+  return [...found];
 }
 
 function ageHours(pair) {
@@ -544,7 +575,189 @@ async function fetchDexScreener(query) {
   }
 }
 
-function analyzeSignal({ query, pair, notes = {}, publicMode = true, connectorError = null }) {
+async function solanaRpc(method, params = []) {
+  let lastError = null;
+  for (const endpoint of solanaRpcEndpoints) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 9000);
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        signal: controller.signal,
+        headers: {
+          "content-type": "application/json",
+          "user-agent": "GhostVeil-Oracle-Swarm/0.1",
+        },
+        body: JSON.stringify({
+          jsonrpc: "2.0",
+          id: `${Date.now()}-${Math.random()}`,
+          method,
+          params,
+        }),
+      });
+      if (!response.ok) throw new Error(`Solana RPC HTTP ${response.status}`);
+      const payload = await response.json();
+      if (payload.error) throw new Error(payload.error.message || "Solana RPC error");
+      return payload.result;
+    } catch (error) {
+      lastError = error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
+  throw lastError || new Error("Solana RPC unavailable");
+}
+
+function pct(numerator, denominator) {
+  if (!denominator || denominator === 0n) return 0;
+  return Number((numerator * 10_000n) / denominator) / 100;
+}
+
+function walletIntelFallback(message) {
+  return {
+    status: "unavailable",
+    target: null,
+    targetType: "unknown",
+    evidence: [message],
+    directEvidence: [],
+    assumptions: ["Wallet intelligence is limited to public Solana RPC heuristics in this build."],
+    convictionAdjustment: 0,
+    riskAdjustment: 0,
+  };
+}
+
+async function fetchTokenHolderIntel(mint) {
+  const [largest, supply] = await Promise.all([
+    solanaRpc("getTokenLargestAccounts", [mint]),
+    solanaRpc("getTokenSupply", [mint]),
+  ]);
+  const accounts = largest?.value || [];
+  const supplyRaw = BigInt(supply?.value?.amount || "0");
+  const top10Raw = accounts.slice(0, 10).reduce((sum, account) => sum + BigInt(account.amount || "0"), 0n);
+  const top5Raw = accounts.slice(0, 5).reduce((sum, account) => sum + BigInt(account.amount || "0"), 0n);
+  const top1Pct = pct(BigInt(accounts[0]?.amount || "0"), supplyRaw);
+  const top5Pct = pct(top5Raw, supplyRaw);
+  const top10Pct = pct(top10Raw, supplyRaw);
+
+  let owners = [];
+  const topTokenAccounts = accounts.slice(0, 10).map((account) => account.address).filter(Boolean);
+  if (topTokenAccounts.length) {
+    const ownerPayload = await solanaRpc("getMultipleAccounts", [
+      topTokenAccounts,
+      { encoding: "jsonParsed" },
+    ]);
+    owners = (ownerPayload?.value || [])
+      .map((account) => account?.data?.parsed?.info?.owner)
+      .filter(Boolean);
+  }
+
+  const uniqueOwners = new Set(owners);
+  const duplicateOwnerCount = Math.max(0, owners.length - uniqueOwners.size);
+  const evidence = [
+    `On-chain holder scan: top holder controls about ${top1Pct.toFixed(2)}% of supply; top 5 control ${top5Pct.toFixed(2)}%; top 10 control ${top10Pct.toFixed(2)}%.`,
+    owners.length
+      ? `Top ${owners.length} token accounts resolve to ${uniqueOwners.size} unique owner wallets. ${duplicateOwnerCount ? `${duplicateOwnerCount} repeated owner relationship(s) need review.` : "No repeated owner wallets found in the top-token-account sample."}`
+      : "Top token-account owner lookup was unavailable from public RPC.",
+    owners.length
+      ? `Largest sampled owner wallets: ${[...uniqueOwners].slice(0, 4).map(shortAddress).join(", ")}.`
+      : "No owner-wallet sample available.",
+  ];
+
+  let riskAdjustment = 0;
+  if (top1Pct >= 20) riskAdjustment += 8;
+  if (top5Pct >= 45) riskAdjustment += 8;
+  if (top10Pct >= 65) riskAdjustment += 10;
+  if (duplicateOwnerCount >= 2) riskAdjustment += 6;
+
+  return {
+    status: "connected",
+    target: mint,
+    targetType: "token_mint",
+    evidence,
+    directEvidence: [
+      `Solana RPC holder scan connected for mint ${shortAddress(mint)}.`,
+      `Top-holder concentration: top 1 ${top1Pct.toFixed(2)}%, top 5 ${top5Pct.toFixed(2)}%, top 10 ${top10Pct.toFixed(2)}%.`,
+    ],
+    assumptions: ["Linked-wallet detection is heuristic: repeated token-account owners suggest possible clustering, not proof of common control."],
+    convictionAdjustment: 4,
+    riskAdjustment,
+  };
+}
+
+async function fetchWalletActivityIntel(wallet) {
+  const [balance, tokenAccounts, signatures] = await Promise.all([
+    solanaRpc("getBalance", [wallet]),
+    solanaRpc("getTokenAccountsByOwner", [wallet, { programId: tokenProgramId }, { encoding: "jsonParsed" }]),
+    solanaRpc("getSignaturesForAddress", [wallet, { limit: 25 }]),
+  ]);
+
+  const sigs = signatures || [];
+  const parsedTxs = sigs.length
+    ? await solanaRpc("getParsedTransactions", [
+        sigs.slice(0, 6).map((item) => item.signature),
+        { maxSupportedTransactionVersion: 0 },
+      ]).catch(() => [])
+    : [];
+  const counterparties = new Map();
+  for (const tx of parsedTxs || []) {
+    for (const key of tx?.transaction?.message?.accountKeys || []) {
+      const pubkey = key?.pubkey?.toString?.() || key?.pubkey || key?.toString?.();
+      if (!pubkey || pubkey === wallet || knownSolanaPrograms.has(pubkey)) continue;
+      counterparties.set(pubkey, (counterparties.get(pubkey) || 0) + 1);
+    }
+  }
+  const repeated = [...counterparties.entries()]
+    .filter(([, count]) => count >= 2)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 4);
+  const oldestSample = sigs[sigs.length - 1]?.blockTime ? new Date(sigs[sigs.length - 1].blockTime * 1000).toISOString() : null;
+  const newestSample = sigs[0]?.blockTime ? new Date(sigs[0].blockTime * 1000).toISOString() : null;
+  const tokenCount = tokenAccounts?.value?.length || 0;
+  const solBalance = (Number(balance?.value || 0) / 1e9).toFixed(4);
+
+  return {
+    status: "connected",
+    target: wallet,
+    targetType: "wallet",
+    evidence: [
+      `Wallet activity scan: ${shortAddress(wallet)} holds about ${solBalance} SOL and ${tokenCount} SPL token account(s).`,
+      sigs.length
+        ? `Recent activity sample: ${sigs.length} signature(s), newest ${newestSample || "unknown"}, oldest in sample ${oldestSample || "unknown"}.`
+        : "No recent signatures returned by public RPC for this wallet.",
+      repeated.length
+        ? `Repeated counterparties in recent transaction sample: ${repeated.map(([address, count]) => `${shortAddress(address)} (${count}x)`).join(", ")}.`
+        : "No repeated counterparties found in the recent transaction sample.",
+    ],
+    directEvidence: [
+      `Solana RPC wallet scan connected for ${shortAddress(wallet)}.`,
+      `Wallet sample includes ${sigs.length} recent signature(s) and ${tokenCount} token account(s).`,
+    ],
+    assumptions: ["Counterparty clustering is a recent-transaction heuristic, not proof that wallets share ownership."],
+    convictionAdjustment: sigs.length ? 5 : 0,
+    riskAdjustment: repeated.length >= 3 ? 8 : repeated.length ? 4 : 0,
+  };
+}
+
+async function fetchWalletIntelligence({ query, pair }) {
+  const candidates = extractSolanaAddresses(query, pair?.baseToken?.address, pair?.pairAddress);
+  const target = pair?.baseToken?.address || candidates[0];
+  if (!target) return walletIntelFallback("No Solana address or token mint was available for wallet intelligence.");
+
+  try {
+    const account = await solanaRpc("getAccountInfo", [target, { encoding: "jsonParsed" }]);
+    const parsedType = account?.value?.data?.parsed?.type;
+    if (parsedType === "mint") return await fetchTokenHolderIntel(target);
+    return await fetchWalletActivityIntel(target);
+  } catch (error) {
+    return {
+      ...walletIntelFallback(`Wallet intelligence attempted for ${shortAddress(target)}, but public Solana RPC could not return holder/cluster data: ${error.message}. Add HELIUS_API_KEY or SOLANA_RPC_URLS for reliable cluster scans.`),
+      target,
+      targetType: pair?.baseToken?.address === target ? "token_mint" : "wallet_or_account",
+    };
+  }
+}
+
+function analyzeSignal({ query, pair, notes = {}, publicMode = true, connectorError = null, walletIntel = null }) {
   const walletNotes = parseNotes(notes.wallet);
   const liquidityNotes = parseNotes(notes.liquidity);
   const narrativeNotes = parseNotes(notes.narrative);
@@ -593,6 +806,7 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, connectorEr
   if (h24Txns >= 100) conviction += 9;
   if (buyRatio >= 0.52 && buyRatio <= 0.68) conviction += 6;
   if (walletNotes.length) conviction += 6;
+  if (walletIntel?.status === "connected") conviction += walletIntel.convictionAdjustment || 0;
   if (liquidityNotes.length) conviction += 5;
   if (narrativeNotes.length) conviction += 5;
   if (counterNotes.length) conviction -= 5;
@@ -610,6 +824,7 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, connectorEr
   if (counterNotes.length) risk += 10;
   if (privateNotes.length) risk += 4;
   if (age !== null && age <= 3) risk += 8;
+  if (walletIntel?.status === "connected") risk += walletIntel.riskAdjustment || 0;
 
   stealth = clamp(stealth);
   conviction = clamp(conviction);
@@ -630,12 +845,14 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, connectorEr
   } else {
     directEvidence.push("No live market pair was connected. Analysis is based only on user-provided evidence.");
   }
+  for (const item of walletIntel?.directEvidence || []) directEvidence.push(item);
   directEvidence.push(socialContext.note);
 
   const route = [
     "User input",
     pair ? "DexScreener Solana pair" : "Provided-data mode",
     socialContext.xPostedAt ? "X timestamp decoded" : "X timing missing",
+    walletIntel?.status === "connected" ? "Solana wallet intelligence" : "Wallet scan limited",
     "GhostVeil local precheck",
     "Alpha Tribunal verdict",
   ].join(" -> ");
@@ -643,12 +860,16 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, connectorEr
 
   const assumptions = [];
   if (walletNotes.length) assumptions.push("Wallet evidence is based on user notes and needs independent verification.");
+  for (const item of walletIntel?.assumptions || []) assumptions.push(item);
   if (socialNotes.length || narrativeNotes.length) assumptions.push("Narrative and social quality are inferred from provided notes.");
   if (!pair) assumptions.push("Scores are framework-based because live Solana market data is unavailable.");
   if (connectorError) assumptions.push(`Live connector note: ${connectorError}.`);
 
   const evidenceTrail = {
-    wallet: walletNotes.length ? walletNotes : ["No wallet evidence provided or connected."],
+    wallet:
+      walletNotes.length || walletIntel?.evidence?.length
+        ? [...(walletIntel?.evidence || []), ...walletNotes]
+        : ["No wallet evidence provided or connected."],
     liquidity: liquidityNotes.length
       ? liquidityNotes
       : pair
@@ -720,6 +941,8 @@ function analyzeSignal({ query, pair, notes = {}, publicMode = true, connectorEr
       : "No live Solana pair connected. This is framework-based analysis of user-provided data.",
     sourceQuality: {
       livePairConnected: Boolean(pair),
+      walletScanConnected: walletIntel?.status === "connected",
+      walletScanType: walletIntel?.targetType || "unavailable",
       userEvidenceProvided: walletNotes.length + liquidityNotes.length + narrativeNotes.length + socialNotes.length + counterNotes.length > 0,
       assumptions,
       directEvidence,
@@ -800,7 +1023,7 @@ async function handleApi(req, res, url) {
     sendJson(res, 200, {
       ok: true,
       app: "GhostVeil Oracle Swarm",
-      connectors: ["DexScreener Solana market context"],
+      connectors: ["DexScreener Solana market context", "Solana RPC wallet intelligence"],
       swarms: {
         configured: Boolean(swarmsApiKey),
         model: swarmsModel,
@@ -835,6 +1058,7 @@ async function handleApi(req, res, url) {
         selectedPair = fetched.pairs[0] || null;
         connectorError = fetched.error;
       }
+      const walletIntel = await fetchWalletIntelligence({ query: body.query, pair: selectedPair });
 
       const result = analyzeSignal({
         query: body.query,
@@ -842,6 +1066,7 @@ async function handleApi(req, res, url) {
         notes: body.notes,
         publicMode: body.publicMode !== false,
         connectorError,
+        walletIntel,
       });
 
       if (body.reviewEngine === "swarms") {

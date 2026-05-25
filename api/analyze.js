@@ -1,6 +1,7 @@
 const {
   analyzeSignal,
   fetchDexScreener,
+  fetchWalletIntelligence,
   mergeSwarmsAlphaCard,
   runSwarmsReview,
 } = require("./_ghostveil");
@@ -22,6 +23,7 @@ module.exports = async function handler(req, res) {
       selectedPair = fetched.pairs[0] || null;
       connectorError = fetched.error;
     }
+    const walletIntel = await fetchWalletIntelligence({ query: body.query, pair: selectedPair });
 
     const result = analyzeSignal({
       query: body.query,
@@ -29,6 +31,7 @@ module.exports = async function handler(req, res) {
       notes: body.notes,
       publicMode: body.publicMode !== false,
       connectorError,
+      walletIntel,
     });
 
     if (body.reviewEngine === "swarms") {

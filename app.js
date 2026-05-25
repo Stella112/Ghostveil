@@ -266,6 +266,7 @@ function renderSourceQuality(result) {
     <div class="quality-row"><span>Data status</span><strong>${escapeHtml(result.dataStatus)}</strong></div>
     <div class="quality-row"><span>Review engine</span><strong>${escapeHtml(result.reviewEngine || "local")}</strong></div>
     <div class="quality-row"><span>Live pair</span><strong>${quality.livePairConnected ? "Connected" : "Not connected"}</strong></div>
+    <div class="quality-row"><span>Wallet intelligence</span><strong>${quality.walletScanConnected ? `Connected (${escapeHtml(quality.walletScanType || "scan")})` : "Not connected"}</strong></div>
     <div class="quality-row"><span>User evidence</span><strong>${quality.userEvidenceProvided ? "Provided" : "Not provided"}</strong></div>
     <div class="quality-row"><span>Swarms API</span><strong>${escapeHtml(result.swarmsReview?.status || "not used")}</strong></div>
     <div class="mini-list">

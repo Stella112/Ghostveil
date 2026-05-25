@@ -5,7 +5,7 @@ module.exports = async function handler(req, res) {
   res.status(200).json({
     ok: true,
     app: "GhostVeil Oracle Swarm",
-    connectors: ["DexScreener Solana market context"],
+    connectors: ["DexScreener Solana market context", "Solana RPC wallet intelligence"],
     swarms: {
       configured: Boolean(process.env.SWARMS_API_KEY),
       model: process.env.SWARMS_MODEL || "gpt-4o-mini",

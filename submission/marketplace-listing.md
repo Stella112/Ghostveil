@@ -48,6 +48,7 @@ It operates through four core engines:
 ## Working App Features
 
 - Live DexScreener Solana market context
+- Solana RPC wallet intelligence for holder concentration and recent wallet counterparty heuristics
 - AI Evidence Desk filled by GhostVeil, not manual user labor
 - Optional manual evidence only for advanced users
 - Swarms multi-agent completion flow
