@@ -279,6 +279,17 @@ function renderWallet() {
   }
 }
 
+function openScanOverlay() {
+  $("#scanOverlay")?.classList.remove("hidden");
+  document.body.classList.add("overlay-open");
+  setTimeout(() => $("#queryInput")?.focus(), 120);
+}
+
+function closeScanOverlay() {
+  $("#scanOverlay")?.classList.add("hidden");
+  document.body.classList.remove("overlay-open");
+}
+
 async function connectWallet() {
   const provider = window.solana;
   if (!provider?.isPhantom && !provider?.connect) {
@@ -361,7 +372,8 @@ async function checkHealth() {
   try {
     const payload = await api("/api/health");
     const swarmsText = payload.swarms?.configured ? "Swarms API connected" : "Swarms key needed";
-    $("#healthStatus").textContent = payload.ok ? `DexScreener ready / ${swarmsText}` : "Connector unavailable";
+    $("#healthStatus").textContent = payload.ok ? "SOLANA_MAINNET" : "Connector unavailable";
+    $("#healthStatus").title = payload.ok ? `DexScreener ready / ${swarmsText}` : "Connector unavailable";
     const swarmsOption = $("#reviewEngine").querySelector('option[value="swarms"]');
     swarmsOption.textContent = payload.swarms?.configured ? "Swarms API agent" : "Swarms API agent (needs key)";
   } catch {
@@ -386,9 +398,21 @@ $("#copyShare").addEventListener("click", async () => {
 $("#exportCard").addEventListener("click", exportLatestCard);
 $("#connectWallet").addEventListener("click", connectWallet);
 $("#heroRunScan")?.addEventListener("click", () => {
-  document.querySelector("#scan")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  setTimeout(() => $("#queryInput")?.focus(), 500);
+  openScanOverlay();
 });
+$("#closeScan")?.addEventListener("click", closeScanOverlay);
+$("#scanOverlay")?.addEventListener("click", (event) => {
+  if (event.target === $("#scanOverlay")) closeScanOverlay();
+});
+document.querySelectorAll(".feed-grid button, .start-scan").forEach((button) => {
+  button.addEventListener("click", openScanOverlay);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") closeScanOverlay();
+});
+if (window.location.hash === "#scan") {
+  openScanOverlay();
+}
 $("#clearHistory").addEventListener("click", () => {
   state.history = [];
   localStorage.removeItem("ghostveil-history");
